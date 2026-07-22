@@ -9,12 +9,10 @@ export default function AdminPage() {
   const [password, setPassword] = useState('');
   const [isAuth, setIsAuth] = useState(false);
 
-  // DB 참조용 데이터
   const [existingSpots, setExistingSpots] = useState<any[]>([]);
   const [existingTricks, setExistingTricks] = useState<any[]>([]);
   const [existingRiders, setExistingRiders] = useState<any[]>([]);
 
-  // 폼 및 관리 데이터 상태
   const [videos, setVideos] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
@@ -26,7 +24,7 @@ export default function AdminPage() {
   const [riderInsta, setRiderInsta] = useState('');
   const [riderType, setRiderType] = useState('일반인');
   const [spotName, setSpotName] = useState('');
-  const [trickNamesInput, setTrickNamesInput] = useState(''); // 쉼표 구분 복수 기술 입력
+  const [trickNamesInput, setTrickNamesInput] = useState('');
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,12 +41,13 @@ export default function AdminPage() {
       .from('videos')
       .select('*, riders(*), spots(*), video_tricks(tricks(*))')
       .order('created_at', { ascending: false });
-    
+
     if (videoData) {
-      // video_tricks 매핑 가공
       const formatted = videoData.map((v) => {
-        const tricks = v.video_tricks ? v.video_tricks.map((vt: any) => vt.tricks) : (v.tricks ? [v.tricks] : []);
-        return { ...v, tricks };
+        const multiTricks = v.video_tricks && v.video_tricks.length > 0
+          ? v.video_tricks.map((vt: any) => vt.tricks).filter(Boolean)
+          : [];
+        return { ...v, tricks: multiTricks };
       });
       setVideos(formatted);
     }
@@ -90,11 +89,7 @@ export default function AdminPage() {
         .upload(filePath, file);
 
       if (uploadError) {
-        if (uploadError.message.includes('Bucket not found')) {
-          alert('🚨 Supabase Storage에 "videos" 버킷이 생성되지 않았습니다.');
-        } else {
-          alert('영상 파일 업로드 실패: ' + uploadError.message);
-        }
+        alert('영상 파일 업로드 실패: ' + uploadError.message);
         return null;
       }
 
@@ -136,7 +131,7 @@ export default function AdminPage() {
         }
       }
 
-      // 1. Rider 처리
+      // 1. 라이더(Rider) 처리
       let riderId;
       const existingRider = existingRiders.find(
         (r) => r.name.trim().toLowerCase() === riderName.trim().toLowerCase()
@@ -157,7 +152,7 @@ export default function AdminPage() {
         riderId = newRider?.id;
       }
 
-      // 2. Spot 처리
+      // 2. 스팟(Spot) 처리
       let spotId;
       const existingSpot = existingSpots.find(
         (s) => s.name.trim().toLowerCase() === spotName.trim().toLowerCase()
@@ -174,7 +169,7 @@ export default function AdminPage() {
         spotId = newSpot?.id;
       }
 
-      // 3. Tricks (복수 기술) 처리
+      // 3. 복수 기술(Tricks) 각각 DB 등록 및 ID 수집
       const rawTrickList = trickNamesInput.split(',').map((t) => t.trim()).filter(Boolean);
       const trickIds: number[] = [];
 
@@ -194,7 +189,8 @@ export default function AdminPage() {
         }
       }
 
-      let currentVideoId = editingId;
+      // 4. 비디오 데이터 저장
+      let targetVideoId = editingId;
 
       if (editingId) {
         await supabase.from('videos').update({
@@ -202,13 +198,13 @@ export default function AdminPage() {
           video_url: finalVideoUrl,
           rider_id: riderId,
           spot_id: spotId,
-          trick_id: trickIds[0] || null, // 호환성용 첫 기술 저장
+          trick_id: trickIds[0] || null,
         }).eq('id', editingId);
 
-        // 기존 중간 매핑 삭제 후 재등록
+        // 기존 중간 테이블 데이터 초기화
         await supabase.from('video_tricks').delete().eq('video_id', editingId);
       } else {
-        const { data: newVideo } = await supabase.from('videos').insert({
+        const { data: newVideo, error: videoInsertErr } = await supabase.from('videos').insert({
           title,
           video_url: finalVideoUrl,
           rider_id: riderId,
@@ -216,24 +212,31 @@ export default function AdminPage() {
           trick_id: trickIds[0] || null,
         }).select('id').single();
 
-        currentVideoId = newVideo?.id;
+        if (videoInsertErr) {
+          throw videoInsertErr;
+        }
+        targetVideoId = newVideo?.id;
       }
 
-      // video_tricks 테이블에 복수 기술 매핑 연결
-      if (currentVideoId && trickIds.length > 0) {
-        const insertPayload = trickIds.map((tid) => ({
-          video_id: currentVideoId,
+      // 5. video_tricks 다대다 중간 테이블에 복수 기술 저장 (가장 중요 🌟)
+      if (targetVideoId && trickIds.length > 0) {
+        const videoTricksPayload = trickIds.map((tid) => ({
+          video_id: targetVideoId,
           trick_id: tid,
         }));
-        await supabase.from('video_tricks').insert(insertPayload);
+        
+        const { error: vtError } = await supabase.from('video_tricks').insert(videoTricksPayload);
+        if (vtError) {
+          console.error('video_tricks insert error:', vtError);
+        }
       }
 
-      alert(editingId ? '영상이 수정되었습니다.' : '새 영상이 업로드 및 등록되었습니다.');
+      alert(editingId ? '영상이 수정되었습니다.' : '새 영상이 복수 기술과 함께 등록되었습니다.');
       resetForm();
       fetchAdminData();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('처리 중 오류가 발생했습니다.');
+      alert('처리 중 오류가 발생했습니다: ' + (error?.message || error));
     } finally {
       setIsUploading(false);
     }
@@ -335,13 +338,12 @@ export default function AdminPage() {
           />
         </div>
 
-        {/* 스팟 & 복수 기술 입력 */}
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-bold text-[#8c8275]">스팟 *</label>
             <input
               type="text"
-              placeholder="스팟명 직접 입력"
+              placeholder="스팟명 입력"
               value={spotName}
               onChange={(e) => setSpotName(e.target.value)}
               className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3 text-xs text-[#2c2825] focus:outline-none focus:border-[#a88963]"
@@ -363,9 +365,7 @@ export default function AdminPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-[#8c8275] flex justify-between items-center">
-              <span>기술명 (쉼표 , 로 복수 등록 가능) *</span>
-            </label>
+            <label className="text-[11px] font-bold text-[#8c8275]">기술명 (쉼표 , 구분) *</label>
             <input
               type="text"
               placeholder="예: 뱅크알리, 킥플립, 50-50"
@@ -375,7 +375,6 @@ export default function AdminPage() {
             />
             {existingTricks.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1">
-                <span className="text-[10px] text-[#8c8275] self-center mr-1">터치하여 추가:</span>
                 {existingTricks.map((t) => (
                   <button
                     key={t.id}
@@ -391,13 +390,12 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* 스케이터 이름 & 구분 */}
         <div className="grid grid-cols-3 gap-2">
           <div className="col-span-2 flex flex-col gap-1">
             <label className="text-[11px] font-bold text-[#8c8275]">스케이터 이름 *</label>
             <input
               type="text"
-              placeholder="이름 직접 입력"
+              placeholder="이름 입력"
               value={riderName}
               onChange={(e) => setRiderName(e.target.value)}
               className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3 text-xs text-[#2c2825] focus:outline-none focus:border-[#a88963]"
@@ -417,20 +415,17 @@ export default function AdminPage() {
         </div>
 
         {existingRiders.length > 0 && (
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] text-[#8c8275] font-bold">기존 보더 선택:</span>
-            <div className="flex flex-wrap gap-1">
-              {existingRiders.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => handleSelectRider(r)}
-                  className="text-[10px] bg-[#f0ebd9] text-[#7a5c38] px-2 py-1 rounded-lg border border-[#e4ddc7] active:scale-95 transition font-medium"
-                >
-                  👤 {r.name} {r.rider_type === '프로' && '🏆'}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-1">
+            {existingRiders.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => handleSelectRider(r)}
+                className="text-[10px] bg-[#f0ebd9] text-[#7a5c38] px-2 py-1 rounded-lg border border-[#e4ddc7] active:scale-95 transition font-medium"
+              >
+                👤 {r.name} {r.rider_type === '프로' && '🏆'}
+              </button>
+            ))}
           </div>
         )}
 
@@ -465,7 +460,6 @@ export default function AdminPage() {
         </div>
       </form>
 
-      {/* 등록 목록 */}
       <div className="flex flex-col gap-2.5">
         <h3 className="text-xs font-bold text-[#8c8275] px-1">등록된 영상 ({videos.length})</h3>
         {videos.map((v) => {
