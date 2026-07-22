@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { ArrowLeft, Trash2, Edit3, Lock, Upload, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Edit3, Lock, Upload } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminPage() {
@@ -24,6 +24,7 @@ export default function AdminPage() {
 
   const [riderName, setRiderName] = useState('');
   const [riderInsta, setRiderInsta] = useState('');
+  const [riderType, setRiderType] = useState('일반인'); // 프로 / 일반인
   const [spotName, setSpotName] = useState('');
   const [trickName, setTrickName] = useState('');
 
@@ -58,8 +59,9 @@ export default function AdminPage() {
     const matchedRider = existingRiders.find(
       (r) => r.name.trim().toLowerCase() === val.trim().toLowerCase()
     );
-    if (matchedRider && matchedRider.instagram) {
-      setRiderInsta(matchedRider.instagram);
+    if (matchedRider) {
+      if (matchedRider.instagram) setRiderInsta(matchedRider.instagram);
+      if (matchedRider.rider_type) setRiderType(matchedRider.rider_type);
     }
   };
 
@@ -123,13 +125,15 @@ export default function AdminPage() {
 
       if (existingRider) {
         riderId = existingRider.id;
-        if (riderInsta && existingRider.instagram !== riderInsta) {
-          await supabase.from('riders').update({ instagram: riderInsta }).eq('id', riderId);
-        }
+        // 라이더 인스타나 구분(프로/일반인) 업데이트
+        await supabase
+          .from('riders')
+          .update({ instagram: riderInsta, rider_type: riderType })
+          .eq('id', riderId);
       } else {
         const { data: newRider } = await supabase
           .from('riders')
-          .insert({ name: riderName.trim(), instagram: riderInsta.trim() })
+          .insert({ name: riderName.trim(), instagram: riderInsta.trim(), rider_type: riderType })
           .select('id')
           .single();
         riderId = newRider?.id;
@@ -214,6 +218,7 @@ export default function AdminPage() {
     setExistingVideoUrl(video.video_url);
     setRiderName(rider?.name || '');
     setRiderInsta(rider?.instagram || '');
+    setRiderType(rider?.rider_type || '일반인');
     setSpotName(spot?.name || '');
     setTrickName(trick?.name || '');
   };
@@ -225,11 +230,11 @@ export default function AdminPage() {
     setExistingVideoUrl('');
     setRiderName('');
     setRiderInsta('');
+    setRiderType('일반인');
     setSpotName('');
     setTrickName('');
   };
 
-  // 비밀번호 인증 전 화면 (베이지 톤 + 비번 미노출)
   if (!isAuth) {
     return (
       <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-5 flex flex-col items-center justify-center max-w-md mx-auto font-sans antialiased">
@@ -247,7 +252,7 @@ export default function AdminPage() {
             placeholder="비밀번호 입력"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3.5 text-sm text-[#2c2825] focus:outline-none focus:border-[#a88963] focus:ring-1 focus:ring-[#a88963] transition"
+            className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3.5 text-sm text-[#2c2825] focus:outline-none focus:border-[#a88963]"
           />
 
           <button type="submit" className="w-full bg-[#3d332a] hover:bg-[#2c231a] text-white font-bold py-3.5 rounded-2xl text-sm transition shadow-sm active:scale-[0.98]">
@@ -280,7 +285,6 @@ export default function AdminPage() {
         ))}
       </datalist>
 
-      {/* 헤더 */}
       <div className="flex items-center justify-between my-3">
         <Link href="/" className="flex items-center gap-1 text-[#8c8275] text-xs font-semibold hover:text-[#3d332a] transition">
           <ArrowLeft size={16} /> 메인으로
@@ -288,7 +292,6 @@ export default function AdminPage() {
         <h1 className="text-sm font-bold text-[#7a5c38]">영상 데이터 관리자</h1>
       </div>
 
-      {/* 입력/수정 폼 */}
       <form onSubmit={handleSubmit} className="bg-white border border-[#e8e2d8] p-5 rounded-3xl flex flex-col gap-3.5 mb-6 shadow-sm">
         <h2 className="text-sm font-bold text-[#3d332a]">
           {editingId ? '✏️ 영상 데이터 수정' : '➕ 새 영상 업로드'}
@@ -313,7 +316,7 @@ export default function AdminPage() {
             type="file"
             accept="video/*"
             onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-            className="bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-2.5 text-xs text-[#6e6355] file:mr-2 file:py-1 file:px-3 file:rounded-xl file:border-0 file:text-xs file:bg-[#f0ebd9] file:text-[#7a5c38] hover:file:bg-[#e4ddc7]"
+            className="bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-2.5 text-xs text-[#6e6355] file:mr-2 file:py-1 file:px-3 file:rounded-xl file:border-0 file:text-xs file:bg-[#f0ebd9] file:text-[#7a5c38]"
           />
         </div>
 
@@ -342,9 +345,10 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-[#8c8275]">스케이터 *</label>
+        {/* 스케이터 이름 / 라이더 구분(프로/일반인) */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="col-span-2 flex flex-col gap-1">
+            <label className="text-[11px] font-bold text-[#8c8275]">스케이터 이름 *</label>
             <input
               type="text"
               list="rider-list"
@@ -355,15 +359,27 @@ export default function AdminPage() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-[#8c8275]">인스타 계정</label>
-            <input
-              type="text"
-              placeholder="자동 입력"
-              value={riderInsta}
-              onChange={(e) => setRiderInsta(e.target.value)}
-              className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3 text-xs text-[#2c2825] focus:outline-none focus:border-[#a88963]"
-            />
+            <label className="text-[11px] font-bold text-[#8c8275]">구분</label>
+            <select
+              value={riderType}
+              onChange={(e) => setRiderType(e.target.value)}
+              className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3 text-xs text-[#2c2825] font-bold focus:outline-none focus:border-[#a88963]"
+            >
+              <option value="일반인">일반인</option>
+              <option value="프로">🏆 프로</option>
+            </select>
           </div>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-[11px] font-bold text-[#8c8275]">인스타 계정</label>
+          <input
+            type="text"
+            placeholder="인스타 ID"
+            value={riderInsta}
+            onChange={(e) => setRiderInsta(e.target.value)}
+            className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3 text-xs text-[#2c2825] focus:outline-none focus:border-[#a88963]"
+          />
         </div>
 
         <div className="flex gap-2 mt-2">
@@ -386,7 +402,6 @@ export default function AdminPage() {
         </div>
       </form>
 
-      {/* 등록된 목록 */}
       <div className="flex flex-col gap-2.5">
         <h3 className="text-xs font-bold text-[#8c8275] px-1">등록된 영상 ({videos.length})</h3>
         {videos.map((v) => {
@@ -398,10 +413,12 @@ export default function AdminPage() {
             <div key={v.id} className="bg-white border border-[#e8e2d8] p-3.5 rounded-2xl flex items-center justify-between shadow-sm">
               <div className="flex flex-col gap-1 overflow-hidden pr-2">
                 <span className="text-xs font-bold text-[#3d332a] truncate">{v.title}</span>
-                <div className="flex gap-1.5 text-[10px] text-[#8c8275] flex-wrap">
+                <div className="flex gap-1.5 text-[10px] text-[#8c8275] flex-wrap items-center">
                   <span>📍 {spot?.name}</span>
                   <span>🛹 {trick?.name}</span>
-                  <span>👤 {rider?.name}</span>
+                  <span>
+                    👤 {rider?.name} {rider?.rider_type === '프로' && <span className="text-amber-600 font-bold">[프로]</span>}
+                  </span>
                 </div>
               </div>
               <div className="flex gap-1 flex-shrink-0">

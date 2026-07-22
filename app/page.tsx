@@ -1,11 +1,11 @@
 export const dynamic = 'force-dynamic';
 
 import { supabase } from '../lib/supabase';
-import { Settings, Play, Calendar, Heart } from 'lucide-react';
+import { Settings, Play, Calendar, Heart, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
 interface PageProps {
-  searchParams: Promise<{ spot?: string; trick?: string; rider?: string }>;
+  searchParams: Promise<{ spot?: string; trick?: string; rider?: string; type?: string }>;
 }
 
 export default async function Home({ searchParams }: PageProps) {
@@ -13,6 +13,7 @@ export default async function Home({ searchParams }: PageProps) {
   const filterSpot = params.spot;
   const filterTrick = params.trick;
   const filterRider = params.rider;
+  const filterType = params.type; // '프로' 필터링 전용
 
   const { data: videos } = await supabase
     .from('videos')
@@ -22,7 +23,7 @@ export default async function Home({ searchParams }: PageProps) {
       video_url,
       likes,
       created_at,
-      riders ( name, instagram ),
+      riders ( name, instagram, rider_type ),
       spots ( name, location_name ),
       tricks ( name, difficulty )
     `)
@@ -34,11 +35,13 @@ export default async function Home({ searchParams }: PageProps) {
   const sampleTricks = Array.from(new Set(allVideos.map((v: any) => (Array.isArray(v.tricks) ? v.tricks[0]?.name : v.tricks?.name)).filter(Boolean))).slice(0, 3);
   const sampleRiders = Array.from(new Set(allVideos.map((v: any) => (Array.isArray(v.riders) ? v.riders[0]?.name : v.riders?.name)).filter(Boolean))).slice(0, 3);
 
+  // 필터링 적용 (프로 필터 포함)
   const filteredVideos = allVideos.filter((v: any) => {
     const rider = Array.isArray(v.riders) ? v.riders[0] : v.riders;
     const spot = Array.isArray(v.spots) ? v.spots[0] : v.spots;
     const trick = Array.isArray(v.tricks) ? v.tricks[0] : v.tricks;
 
+    if (filterType && rider?.rider_type !== filterType) return false;
     if (filterSpot && spot?.name !== filterSpot) return false;
     if (filterTrick && trick?.name !== filterTrick) return false;
     if (filterRider && rider?.name !== filterRider) return false;
@@ -63,14 +66,30 @@ export default async function Home({ searchParams }: PageProps) {
       {/* 필터 영역 */}
       <section className="w-full mb-5 flex flex-col gap-3 bg-white border border-[#e8e2d8] p-4 rounded-3xl shadow-sm">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-[#8c8275]">빠른 샘플 필터</span>
-          {(filterSpot || filterTrick || filterRider) && (
+          <span className="text-xs font-bold text-[#8c8275]">카테고리 & 샘플 필터</span>
+          {(filterSpot || filterTrick || filterRider || filterType) && (
             <Link href="/" className="text-[11px] text-[#a88963] font-bold hover:underline">
               필터 초기화
             </Link>
           )}
         </div>
 
+        {/* 프로 전용 탭/칩 선택 */}
+        <div className="flex items-center gap-2 border-b border-[#f0ebd9] pb-2.5">
+          <Link
+            href={filterType === '프로' ? '/' : '/?type=프로'}
+            className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-full transition border ${
+              filterType === '프로'
+                ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                : 'bg-[#f0ebd9] text-[#7a5c38] border-[#e4ddc7] hover:bg-[#e4ddc7]'
+            }`}
+          >
+            <Trophy size={13} />
+            <span>🏆 프로 영상만 보기</span>
+          </Link>
+        </div>
+
+        {/* 일반 샘플 칩들 */}
         <div className="flex flex-col gap-2">
           {sampleSpots.length > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap">
@@ -134,7 +153,9 @@ export default async function Home({ searchParams }: PageProps) {
       {/* 영상 카드 목록 */}
       <section className="w-full flex flex-col gap-4">
         <div className="flex items-center justify-between px-1">
-          <h2 className="text-xs font-bold text-[#8c8275]">🔥 인기 영상 순 ({filteredVideos.length})</h2>
+          <h2 className="text-xs font-bold text-[#8c8275]">
+            {filterType === '프로' ? '🏆 프로 스케이터 영상' : '🔥 인기 영상 순'} ({filteredVideos.length})
+          </h2>
         </div>
 
         {filteredVideos.length > 0 ? (
@@ -171,6 +192,13 @@ export default async function Home({ searchParams }: PageProps) {
                         <Play size={22} className="ml-0.5 fill-[#3d332a]" />
                       </div>
                     </div>
+
+                    {/* 프로 배지 */}
+                    {r?.rider_type === '프로' && (
+                      <div className="absolute top-3 left-3 bg-amber-600/90 backdrop-blur-md px-2.5 py-1 rounded-full text-white text-[10px] font-extrabold shadow-sm flex items-center gap-1">
+                        <Trophy size={11} /> PRO
+                      </div>
+                    )}
 
                     {/* 좋아요 배지 */}
                     <div className="absolute top-3 right-3 bg-white/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/40 flex items-center gap-1 text-[#e04f5f] text-xs font-bold shadow-sm">
