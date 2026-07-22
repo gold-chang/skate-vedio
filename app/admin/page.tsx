@@ -24,7 +24,7 @@ export default function AdminPage() {
 
   const [riderName, setRiderName] = useState('');
   const [riderInsta, setRiderInsta] = useState('');
-  const [riderType, setRiderType] = useState('일반인'); // 프로 / 일반인
+  const [riderType, setRiderType] = useState('일반인');
   const [spotName, setSpotName] = useState('');
   const [trickName, setTrickName] = useState('');
 
@@ -54,15 +54,10 @@ export default function AdminPage() {
     if (ridersData) setExistingRiders(ridersData);
   };
 
-  const handleRiderNameChange = (val: string) => {
-    setRiderName(val);
-    const matchedRider = existingRiders.find(
-      (r) => r.name.trim().toLowerCase() === val.trim().toLowerCase()
-    );
-    if (matchedRider) {
-      if (matchedRider.instagram) setRiderInsta(matchedRider.instagram);
-      if (matchedRider.rider_type) setRiderType(matchedRider.rider_type);
-    }
+  const handleSelectRider = (rider: any) => {
+    setRiderName(rider.name);
+    if (rider.instagram) setRiderInsta(rider.instagram);
+    if (rider.rider_type) setRiderType(rider.rider_type);
   };
 
   const uploadVideoFile = async (file: File): Promise<string | null> => {
@@ -76,7 +71,11 @@ export default function AdminPage() {
         .upload(filePath, file);
 
       if (uploadError) {
-        alert('영상 파일 업로드 실패: ' + uploadError.message);
+        if (uploadError.message.includes('Bucket not found')) {
+          alert('🚨 Supabase Storage에 "videos" 버킷이 생성되지 않았습니다.\nSupabase -> Storage -> New bucket (Name: videos, Public: ON)을 생성해 주세요!');
+        } else {
+          alert('영상 파일 업로드 실패: ' + uploadError.message);
+        }
         return null;
       }
 
@@ -125,7 +124,6 @@ export default function AdminPage() {
 
       if (existingRider) {
         riderId = existingRider.id;
-        // 라이더 인스타나 구분(프로/일반인) 업데이트
         await supabase
           .from('riders')
           .update({ instagram: riderInsta, rider_type: riderType })
@@ -269,22 +267,6 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-4 flex flex-col max-w-md mx-auto pb-12 font-sans antialiased">
-      <datalist id="spot-list">
-        {existingSpots.map((s) => (
-          <option key={s.id} value={s.name} />
-        ))}
-      </datalist>
-      <datalist id="trick-list">
-        {existingTricks.map((t) => (
-          <option key={t.id} value={t.name} />
-        ))}
-      </datalist>
-      <datalist id="rider-list">
-        {existingRiders.map((r) => (
-          <option key={r.id} value={r.name} />
-        ))}
-      </datalist>
-
       <div className="flex items-center justify-between my-3">
         <Link href="/" className="flex items-center gap-1 text-[#8c8275] text-xs font-semibold hover:text-[#3d332a] transition">
           <ArrowLeft size={16} /> 메인으로
@@ -301,7 +283,7 @@ export default function AdminPage() {
           <label className="text-[11px] font-bold text-[#8c8275]">영상 제목 *</label>
           <input
             type="text"
-            placeholder="예: 성수 스팟 베스트 트릭"
+            placeholder="예: 창규 코치님 뱅크 알리"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3 text-xs text-[#2c2825] focus:outline-none focus:border-[#a88963]"
@@ -320,41 +302,68 @@ export default function AdminPage() {
           />
         </div>
 
+        {/* 스팟 & 기술 빠른 선택 칩 */}
         <div className="grid grid-cols-2 gap-2.5">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-bold text-[#8c8275]">스팟 *</label>
             <input
               type="text"
-              list="spot-list"
-              placeholder="선택 또는 입력"
+              placeholder="직접 입력"
               value={spotName}
               onChange={(e) => setSpotName(e.target.value)}
               className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3 text-xs text-[#2c2825] focus:outline-none focus:border-[#a88963]"
             />
+            {existingSpots.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {existingSpots.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSpotName(s.name)}
+                    className="text-[10px] bg-[#f0ebd9] text-[#7a5c38] px-2 py-0.5 rounded-lg border border-[#e4ddc7]"
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-bold text-[#8c8275]">기술명 *</label>
             <input
               type="text"
-              list="trick-list"
-              placeholder="선택 또는 입력"
+              placeholder="직접 입력"
               value={trickName}
               onChange={(e) => setTrickName(e.target.value)}
               className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3 text-xs text-[#2c2825] focus:outline-none focus:border-[#a88963]"
             />
+            {existingTricks.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {existingTricks.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setTrickName(t.name)}
+                    className="text-[10px] bg-[#f0ebd9] text-[#7a5c38] px-2 py-0.5 rounded-lg border border-[#e4ddc7]"
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* 스케이터 이름 / 라이더 구분(프로/일반인) */}
+        {/* 스케이터 이름 & 구분 & 빠른 터치 선택 */}
         <div className="grid grid-cols-3 gap-2">
           <div className="col-span-2 flex flex-col gap-1">
             <label className="text-[11px] font-bold text-[#8c8275]">스케이터 이름 *</label>
             <input
               type="text"
-              list="rider-list"
-              placeholder="이름 입력"
+              placeholder="이름 직접 입력"
               value={riderName}
-              onChange={(e) => handleRiderNameChange(e.target.value)}
+              onChange={(e) => setRiderName(e.target.value)}
               className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3 text-xs text-[#2c2825] focus:outline-none focus:border-[#a88963]"
             />
           </div>
@@ -370,6 +379,25 @@ export default function AdminPage() {
             </select>
           </div>
         </div>
+
+        {/* 기존 스케이터 선택 칩 (클릭 시 이름, 인스타, 프로구분 자동입력) */}
+        {existingRiders.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] text-[#8c8275] font-bold">기존 보더 빠른 선택:</span>
+            <div className="flex flex-wrap gap-1">
+              {existingRiders.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => handleSelectRider(r)}
+                  className="text-[10px] bg-[#f0ebd9] text-[#7a5c38] px-2 py-0.5 rounded-lg border border-[#e4ddc7] font-medium"
+                >
+                  👤 {r.name} {r.rider_type === '프로' && '🏆'}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-bold text-[#8c8275]">인스타 계정</label>
@@ -402,6 +430,7 @@ export default function AdminPage() {
         </div>
       </form>
 
+      {/* 등록 목록 */}
       <div className="flex flex-col gap-2.5">
         <h3 className="text-xs font-bold text-[#8c8275] px-1">등록된 영상 ({videos.length})</h3>
         {videos.map((v) => {
