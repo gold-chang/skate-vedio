@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { Play, Heart, Trophy, Calendar } from 'lucide-react';
+import { Play, Heart, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
 interface VideoGridProps {
@@ -28,14 +28,14 @@ export default function VideoGrid({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const observerRef = useRef<HTMLDivElement | null>(null);
 
-  // 필터나 정렬이 바뀌면 목록 리셋
+  // 필터나 정렬 변경 시 리셋
   useEffect(() => {
     setVideos(initialVideos);
     setPage(1);
     setHasMore(initialVideos.length >= 20);
   }, [initialVideos, filterSpot, filterTrick, filterRider, filterType, sortType]);
 
-  // 추가 20개 불러오기 함수
+  // 추가 영상 20개 불러오기
   const loadMoreVideos = async () => {
     if (isLoading || !hasMore) return;
     setIsLoading(true);
@@ -79,7 +79,6 @@ export default function VideoGrid({
       return { ...v, tricksList: multiTricks };
     });
 
-    // 클라이언트 단 필터 적용
     const filtered = formatted.filter((v: any) => {
       const rider = Array.isArray(v.riders) ? v.riders[0] : v.riders;
       const spot = Array.isArray(v.spots) ? v.spots[0] : v.spots;
@@ -101,7 +100,6 @@ export default function VideoGrid({
     setIsLoading(false);
   };
 
-  // Intersection Observer를 이용한 하단 스크롤 감지
   useEffect(() => {
     if (!observerRef.current || !hasMore) return;
 
@@ -128,7 +126,7 @@ export default function VideoGrid({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 🚀 1줄에 2개씩 배치하는 그리드 (grid-cols-2) */}
+      {/* 2열 그리드 영상 카드 목록 */}
       <div className="grid grid-cols-2 gap-2.5">
         {videos.map((item: any) => {
           const r = Array.isArray(item.riders) ? item.riders[0] : item.riders;
@@ -140,6 +138,7 @@ export default function VideoGrid({
               key={item.id}
               className="bg-white border border-[#e8e2d8] rounded-2xl overflow-hidden shadow-2xs hover:shadow-sm transition flex flex-col"
             >
+              {/* 썸네일 (클릭 시 상세페이지 이동) */}
               <Link href={`/video/${item.id}`} className="relative aspect-square bg-[#221e1a] group block overflow-hidden">
                 <video
                   src={`${item.video_url}#t=0.1`}
@@ -166,31 +165,42 @@ export default function VideoGrid({
                 </div>
               </Link>
 
+              {/* 하단 메타 정보 & 필터 연동 칩들 */}
               <div className="p-2.5 flex flex-col gap-1.5">
                 <Link href={`/video/${item.id}`} className="text-xs font-bold text-[#2c2825] hover:text-[#7a5c38] leading-tight line-clamp-1">
                   {item.title}
                 </Link>
 
                 <div className="flex items-center gap-1 flex-wrap">
+                  {/* 📍 스팟 칩 (클릭 시 스팟 필터 적용) */}
                   {s?.name && (
-                    <span className="text-[9px] bg-[#f7f4ef] text-[#6e6355] px-1.5 py-0.5 rounded border border-[#e8e2d8] font-medium truncate max-w-[90px]">
+                    <Link
+                      href={`/?spot=${encodeURIComponent(s.name)}`}
+                      className="text-[9px] bg-[#f7f4ef] text-[#6e6355] hover:bg-[#e8e2d8] hover:text-[#3d332a] px-1.5 py-0.5 rounded border border-[#e8e2d8] font-medium truncate max-w-[90px] transition active:scale-95"
+                    >
                       📍 {s.name}
-                    </span>
+                    </Link>
                   )}
 
+                  {/* 🛹 기술 칩들 (클릭 시 기술 필터 적용) */}
                   {tricks.map((t: any, idx: number) => (
-                    <span
+                    <Link
                       key={idx}
-                      className="text-[9px] bg-[#f0ebd9] text-[#7a5c38] px-1.5 py-0.5 rounded border border-[#e4ddc7] font-bold truncate max-w-[90px]"
+                      href={`/?trick=${encodeURIComponent(t?.name || '')}`}
+                      className="text-[9px] bg-[#f0ebd9] text-[#7a5c38] hover:bg-[#e4ddc7] hover:text-[#3d332a] px-1.5 py-0.5 rounded border border-[#e4ddc7] font-bold truncate max-w-[90px] transition active:scale-95"
                     >
                       🛹 {t?.name}
-                    </span>
+                    </Link>
                   ))}
 
+                  {/* 👤 스케이터 칩 (클릭 시 보더 필터 적용) */}
                   {r?.name && (
-                    <span className="text-[9px] bg-[#f7f4ef] text-[#6e6355] px-1.5 py-0.5 rounded border border-[#e8e2d8] font-medium truncate max-w-[90px]">
+                    <Link
+                      href={`/?rider=${encodeURIComponent(r.name)}`}
+                      className="text-[9px] bg-[#f7f4ef] text-[#6e6355] hover:bg-[#e8e2d8] hover:text-[#3d332a] px-1.5 py-0.5 rounded border border-[#e8e2d8] font-medium truncate max-w-[90px] transition active:scale-95"
+                    >
                       👤 {r.name}
-                    </span>
+                    </Link>
                   )}
                 </div>
               </div>
@@ -199,7 +209,7 @@ export default function VideoGrid({
         })}
       </div>
 
-      {/* 스크롤 감지용 엘리먼트 및 로딩 표시 */}
+      {/* 무한 스크롤 영역 */}
       {hasMore && (
         <div ref={observerRef} className="py-6 flex items-center justify-center text-xs text-[#8c8275] font-medium">
           {isLoading ? '추가 영상 불러오는 중...' : '스크롤하여 더 보기'}

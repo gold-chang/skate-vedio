@@ -19,7 +19,7 @@ export default async function Home({ searchParams }: PageProps) {
 
   let orderByField = sortType === 'recent' ? 'created_at' : 'likes';
 
-  // 🚀 초기 20개만 가져오기 (.range(0, 19))
+  // 초기 20개 가져오기
   const { data: rawVideos } = await supabase
     .from('videos')
     .select(`
@@ -49,7 +49,7 @@ export default async function Home({ searchParams }: PageProps) {
 
   const sampleSpots = Array.from(new Set(allVideos.map((v: any) => (Array.isArray(v.spots) ? v.spots[0]?.name : v.spots?.name)).filter(Boolean))).slice(0, 3);
   const sampleTricks = Array.from(new Set(allVideos.flatMap((v: any) => v.tricksList.map((t: any) => t?.name)).filter(Boolean))).slice(0, 4);
-  const sampleRiders = Array.from(new Set(allVideos.map((v: any) => (Array.isArray(v.riders) ? v.riders[0]?.name : v.riders?.name)).filter(Boolean))).slice(0, 3);
+  const sampleRiders = Array.from(new Set(allVideos.map((v: any) => (Array.isArray(v.riders) ? v.riders[0]?.name : v.riders?.name)).filter(Boolean))).slice(0, 4);
 
   const filteredVideos = allVideos.filter((v: any) => {
     const rider = Array.isArray(v.riders) ? v.riders[0] : v.riders;
@@ -99,6 +99,7 @@ export default async function Home({ searchParams }: PageProps) {
           )}
         </div>
 
+        {/* 프로 전용 필터 */}
         <div className="flex items-center gap-2 border-b border-[#f0ebd9] pb-2">
           <Link
             href={filterType === '프로' ? '/' : '/?type=프로'}
@@ -113,6 +114,7 @@ export default async function Home({ searchParams }: PageProps) {
           </Link>
         </div>
 
+        {/* 샘플 필터 칩 목록 (스팟 / 기술 / 보더) */}
         <div className="flex flex-col gap-1.5">
           {sampleSpots.length > 0 && (
             <div className="flex items-center gap-1 flex-wrap">
@@ -151,6 +153,26 @@ export default async function Home({ searchParams }: PageProps) {
               ))}
             </div>
           )}
+
+          {/* 🚀 복구된 보더(스케이터) 필터 라인 */}
+          {sampleRiders.length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] text-[#a09587] font-bold mr-0.5">보더</span>
+              {sampleRiders.map((riderName: any) => (
+                <Link
+                  key={riderName}
+                  href={`/?rider=${encodeURIComponent(riderName)}`}
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium transition border ${
+                    filterRider === riderName
+                      ? 'bg-[#3d332a] text-white border-[#3d332a]'
+                      : 'bg-[#f7f4ef] text-[#544a3e] border-[#e8e2d8] hover:border-[#a88963]'
+                  }`}
+                >
+                  👤 {riderName}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -180,7 +202,7 @@ export default async function Home({ searchParams }: PageProps) {
         </Link>
       </div>
 
-      {/* 🚀 2열 그리드 + 무한 스크롤 컴포넌트 호출 */}
+      {/* 2열 그리드 영상 목록 */}
       <section className="w-full">
         <VideoGrid
           initialVideos={filteredVideos}
