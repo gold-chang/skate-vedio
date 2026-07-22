@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { ArrowLeft, Trash2, Edit3, Lock, Upload } from 'lucide-react';
+import { ArrowLeft, Trash2, Edit3, Lock, Upload, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminPage() {
@@ -26,7 +26,7 @@ export default function AdminPage() {
   const [riderInsta, setRiderInsta] = useState('');
   const [riderType, setRiderType] = useState('일반인');
   const [spotName, setSpotName] = useState('');
-  const [trickName, setTrickName] = useState('');
+  const [trickNamesInput, setTrickNamesInput] = useState(''); // 쉼표 구분 복수 기술 입력
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,9 +41,17 @@ export default function AdminPage() {
   const fetchAdminData = async () => {
     const { data: videoData } = await supabase
       .from('videos')
-      .select('*, riders(*), spots(*), tricks(*)')
+      .select('*, riders(*), spots(*), video_tricks(tricks(*))')
       .order('created_at', { ascending: false });
-    if (videoData) setVideos(videoData);
+    
+    if (videoData) {
+      // video_tricks 매핑 가공
+      const formatted = videoData.map((v) => {
+        const tricks = v.video_tricks ? v.video_tricks.map((vt: any) => vt.tricks) : (v.tricks ? [v.tricks] : []);
+        return { ...v, tricks };
+      });
+      setVideos(formatted);
+    }
 
     const { data: spotsData } = await supabase.from('spots').select('*').order('name');
     const { data: tricksData } = await supabase.from('tricks').select('*').order('name');
@@ -60,6 +68,17 @@ export default function AdminPage() {
     if (rider.rider_type) setRiderType(rider.rider_type);
   };
 
+  const handleAddTrickChip = (trickName: string) => {
+    if (!trickNamesInput.trim()) {
+      setTrickNamesInput(trickName);
+    } else {
+      const currentList = trickNamesInput.split(',').map((s) => s.trim()).filter(Boolean);
+      if (!currentList.includes(trickName)) {
+        setTrickNamesInput([...currentList, trickName].join(', '));
+      }
+    }
+  };
+
   const uploadVideoFile = async (file: File): Promise<string | null> => {
     try {
       const fileExt = file.name.split('.').pop();
@@ -72,7 +91,7 @@ export default function AdminPage() {
 
       if (uploadError) {
         if (uploadError.message.includes('Bucket not found')) {
-          alert('🚨 Supabase Storage에 "videos" 버킷이 생성되지 않았습니다.\nSupabase -> Storage -> New bucket (Name: videos, Public: ON)을 생성해 주세요!');
+          alert('🚨 Supabase Storage에 "videos" 버킷이 생성되지 않았습니다.');
         } else {
           alert('영상 파일 업로드 실패: ' + uploadError.message);
         }
@@ -92,7 +111,7 @@ export default function AdminPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !spotName || !trickName || !riderName) {
+    if (!title || !spotName || !trickNamesInput || !riderName) {
       alert('모든 필수 항목을 입력해주세요.');
       return;
     }
@@ -117,6 +136,7 @@ export default function AdminPage() {
         }
       }
 
+      // 1. Rider 처리
       let riderId;
       const existingRider = existingRiders.find(
         (r) => r.name.trim().toLowerCase() === riderName.trim().toLowerCase()
@@ -137,6 +157,7 @@ export default function AdminPage() {
         riderId = newRider?.id;
       }
 
+      // 2. Spot 처리
       let spotId;
       const existingSpot = existingSpots.find(
         (s) => s.name.trim().toLowerCase() === spotName.trim().toLowerCase()
@@ -153,21 +174,27 @@ export default function AdminPage() {
         spotId = newSpot?.id;
       }
 
-      let trickId;
-      const existingTrick = existingTricks.find(
-        (t) => t.name.trim().toLowerCase() === trickName.trim().toLowerCase()
-      );
+      // 3. Tricks (복수 기술) 처리
+      const rawTrickList = trickNamesInput.split(',').map((t) => t.trim()).filter(Boolean);
+      const trickIds: number[] = [];
 
-      if (existingTrick) {
-        trickId = existingTrick.id;
-      } else {
-        const { data: newTrick } = await supabase
-          .from('tricks')
-          .insert({ name: trickName.trim() })
-          .select('id')
-          .single();
-        trickId = newTrick?.id;
+      for (const tName of rawTrickList) {
+        const existingTrick = existingTricks.find(
+          (t) => t.name.trim().toLowerCase() === tName.toLowerCase()
+        );
+        if (existingTrick) {
+          trickIds.push(existingTrick.id);
+        } else {
+          const { data: newTrick } = await supabase
+            .from('tricks')
+            .insert({ name: tName })
+            .select('id')
+            .single();
+          if (newTrick) trickIds.push(newTrick.id);
+        }
       }
+
+      let currentVideoId = editingId;
 
       if (editingId) {
         await supabase.from('videos').update({
@@ -175,20 +202,33 @@ export default function AdminPage() {
           video_url: finalVideoUrl,
           rider_id: riderId,
           spot_id: spotId,
-          trick_id: trickId,
+          trick_id: trickIds[0] || null, // 호환성용 첫 기술 저장
         }).eq('id', editingId);
-        alert('영상이 수정되었습니다.');
+
+        // 기존 중간 매핑 삭제 후 재등록
+        await supabase.from('video_tricks').delete().eq('video_id', editingId);
       } else {
-        await supabase.from('videos').insert({
+        const { data: newVideo } = await supabase.from('videos').insert({
           title,
           video_url: finalVideoUrl,
           rider_id: riderId,
           spot_id: spotId,
-          trick_id: trickId,
-        });
-        alert('새 영상이 업로드 및 등록되었습니다.');
+          trick_id: trickIds[0] || null,
+        }).select('id').single();
+
+        currentVideoId = newVideo?.id;
       }
 
+      // video_tricks 테이블에 복수 기술 매핑 연결
+      if (currentVideoId && trickIds.length > 0) {
+        const insertPayload = trickIds.map((tid) => ({
+          video_id: currentVideoId,
+          trick_id: tid,
+        }));
+        await supabase.from('video_tricks').insert(insertPayload);
+      }
+
+      alert(editingId ? '영상이 수정되었습니다.' : '새 영상이 업로드 및 등록되었습니다.');
       resetForm();
       fetchAdminData();
     } catch (error) {
@@ -209,7 +249,7 @@ export default function AdminPage() {
   const startEdit = (video: any) => {
     const rider = Array.isArray(video.riders) ? video.riders[0] : video.riders;
     const spot = Array.isArray(video.spots) ? video.spots[0] : video.spots;
-    const trick = Array.isArray(video.tricks) ? video.tricks[0] : video.tricks;
+    const tricks = video.tricks || [];
 
     setEditingId(video.id);
     setTitle(video.title);
@@ -218,7 +258,7 @@ export default function AdminPage() {
     setRiderInsta(rider?.instagram || '');
     setRiderType(rider?.rider_type || '일반인');
     setSpotName(spot?.name || '');
-    setTrickName(trick?.name || '');
+    setTrickNamesInput(tricks.map((t: any) => t?.name).filter(Boolean).join(', '));
   };
 
   const resetForm = () => {
@@ -230,7 +270,7 @@ export default function AdminPage() {
     setRiderInsta('');
     setRiderType('일반인');
     setSpotName('');
-    setTrickName('');
+    setTrickNamesInput('');
   };
 
   if (!isAuth) {
@@ -242,9 +282,7 @@ export default function AdminPage() {
               <Lock size={22} />
             </div>
             <h2 className="text-base font-bold text-[#3d332a]">관리자 인증</h2>
-            <p className="text-xs text-[#8c8275]">비밀번호를 입력하여 관리자 권한을 인증하세요.</p>
           </div>
-
           <input
             type="password"
             placeholder="비밀번호 입력"
@@ -252,14 +290,9 @@ export default function AdminPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3.5 text-sm text-[#2c2825] focus:outline-none focus:border-[#a88963]"
           />
-
-          <button type="submit" className="w-full bg-[#3d332a] hover:bg-[#2c231a] text-white font-bold py-3.5 rounded-2xl text-sm transition shadow-sm active:scale-[0.98]">
+          <button type="submit" className="w-full bg-[#3d332a] text-white font-bold py-3.5 rounded-2xl text-sm transition shadow-sm active:scale-[0.98]">
             접속하기
           </button>
-          
-          <Link href="/" className="text-xs text-center text-[#8c8275] hover:text-[#3d332a] transition underline underline-offset-4 mt-1">
-            메인 페이지로 돌아가기
-          </Link>
         </form>
       </main>
     );
@@ -271,7 +304,7 @@ export default function AdminPage() {
         <Link href="/" className="flex items-center gap-1 text-[#8c8275] text-xs font-semibold hover:text-[#3d332a] transition">
           <ArrowLeft size={16} /> 메인으로
         </Link>
-        <h1 className="text-sm font-bold text-[#7a5c38]">영상 데이터 관리자</h1>
+        <h1 className="text-sm font-bold text-[#7a5c38]">스케이트보드 로그 관리자</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white border border-[#e8e2d8] p-5 rounded-3xl flex flex-col gap-3.5 mb-6 shadow-sm">
@@ -292,7 +325,7 @@ export default function AdminPage() {
 
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-bold text-[#8c8275] flex items-center gap-1">
-            <Upload size={12} /> 영상 파일 선택 (MP4 등) *
+            <Upload size={12} /> 영상 파일 선택 *
           </label>
           <input
             type="file"
@@ -302,13 +335,13 @@ export default function AdminPage() {
           />
         </div>
 
-        {/* 스팟 & 기술 빠른 선택 칩 */}
-        <div className="grid grid-cols-2 gap-2.5">
+        {/* 스팟 & 복수 기술 입력 */}
+        <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] font-bold text-[#8c8275]">스팟 *</label>
             <input
               type="text"
-              placeholder="직접 입력"
+              placeholder="스팟명 직접 입력"
               value={spotName}
               onChange={(e) => setSpotName(e.target.value)}
               className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3 text-xs text-[#2c2825] focus:outline-none focus:border-[#a88963]"
@@ -320,9 +353,9 @@ export default function AdminPage() {
                     key={s.id}
                     type="button"
                     onClick={() => setSpotName(s.name)}
-                    className="text-[10px] bg-[#f0ebd9] text-[#7a5c38] px-2 py-0.5 rounded-lg border border-[#e4ddc7]"
+                    className="text-[10px] bg-[#f0ebd9] text-[#7a5c38] px-2 py-1 rounded-lg border border-[#e4ddc7] active:scale-95 transition font-medium"
                   >
-                    {s.name}
+                    📍 {s.name}
                   </button>
                 ))}
               </div>
@@ -330,24 +363,27 @@ export default function AdminPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-[#8c8275]">기술명 *</label>
+            <label className="text-[11px] font-bold text-[#8c8275] flex justify-between items-center">
+              <span>기술명 (쉼표 , 로 복수 등록 가능) *</span>
+            </label>
             <input
               type="text"
-              placeholder="직접 입력"
-              value={trickName}
-              onChange={(e) => setTrickName(e.target.value)}
+              placeholder="예: 뱅크알리, 킥플립, 50-50"
+              value={trickNamesInput}
+              onChange={(e) => setTrickNamesInput(e.target.value)}
               className="w-full bg-[#fcfbfa] border border-[#e0d8cc] rounded-2xl p-3 text-xs text-[#2c2825] focus:outline-none focus:border-[#a88963]"
             />
             {existingTricks.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1">
+                <span className="text-[10px] text-[#8c8275] self-center mr-1">터치하여 추가:</span>
                 {existingTricks.map((t) => (
                   <button
                     key={t.id}
                     type="button"
-                    onClick={() => setTrickName(t.name)}
-                    className="text-[10px] bg-[#f0ebd9] text-[#7a5c38] px-2 py-0.5 rounded-lg border border-[#e4ddc7]"
+                    onClick={() => handleAddTrickChip(t.name)}
+                    className="text-[10px] bg-[#f0ebd9] text-[#7a5c38] px-2 py-1 rounded-lg border border-[#e4ddc7] active:scale-95 transition font-medium flex items-center gap-0.5"
                   >
-                    {t.name}
+                    <Plus size={10} /> 🛹 {t.name}
                   </button>
                 ))}
               </div>
@@ -355,7 +391,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* 스케이터 이름 & 구분 & 빠른 터치 선택 */}
+        {/* 스케이터 이름 & 구분 */}
         <div className="grid grid-cols-3 gap-2">
           <div className="col-span-2 flex flex-col gap-1">
             <label className="text-[11px] font-bold text-[#8c8275]">스케이터 이름 *</label>
@@ -380,17 +416,16 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* 기존 스케이터 선택 칩 (클릭 시 이름, 인스타, 프로구분 자동입력) */}
         {existingRiders.length > 0 && (
           <div className="flex flex-col gap-1">
-            <span className="text-[10px] text-[#8c8275] font-bold">기존 보더 빠른 선택:</span>
+            <span className="text-[10px] text-[#8c8275] font-bold">기존 보더 선택:</span>
             <div className="flex flex-wrap gap-1">
               {existingRiders.map((r) => (
                 <button
                   key={r.id}
                   type="button"
                   onClick={() => handleSelectRider(r)}
-                  className="text-[10px] bg-[#f0ebd9] text-[#7a5c38] px-2 py-0.5 rounded-lg border border-[#e4ddc7] font-medium"
+                  className="text-[10px] bg-[#f0ebd9] text-[#7a5c38] px-2 py-1 rounded-lg border border-[#e4ddc7] active:scale-95 transition font-medium"
                 >
                   👤 {r.name} {r.rider_type === '프로' && '🏆'}
                 </button>
@@ -436,7 +471,7 @@ export default function AdminPage() {
         {videos.map((v) => {
           const rider = Array.isArray(v.riders) ? v.riders[0] : v.riders;
           const spot = Array.isArray(v.spots) ? v.spots[0] : v.spots;
-          const trick = Array.isArray(v.tricks) ? v.tricks[0] : v.tricks;
+          const tricks = v.tricks || [];
 
           return (
             <div key={v.id} className="bg-white border border-[#e8e2d8] p-3.5 rounded-2xl flex items-center justify-between shadow-sm">
@@ -444,10 +479,8 @@ export default function AdminPage() {
                 <span className="text-xs font-bold text-[#3d332a] truncate">{v.title}</span>
                 <div className="flex gap-1.5 text-[10px] text-[#8c8275] flex-wrap items-center">
                   <span>📍 {spot?.name}</span>
-                  <span>🛹 {trick?.name}</span>
-                  <span>
-                    👤 {rider?.name} {rider?.rider_type === '프로' && <span className="text-amber-600 font-bold">[프로]</span>}
-                  </span>
+                  <span>🛹 {tricks.map((t: any) => t?.name).filter(Boolean).join(', ')}</span>
+                  <span>👤 {rider?.name}</span>
                 </div>
               </div>
               <div className="flex gap-1 flex-shrink-0">
