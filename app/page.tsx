@@ -3,34 +3,38 @@ import SkateVideoPlayer from '../components/SkateVideoPlayer';
 import { MessageCircle } from 'lucide-react';
 
 export default async function Home() {
-  // DB 조회가 안 될 경우를 대비한 가짜 데이터(Fallback)
-  // app/page.tsx 상단 부근
+  // DB 조회가 안 될 경우를 대비한 예비용(Fallback) 데이터
   const defaultVideo = {
-    title: '뚝섬 렛지 노즈그라인드 완벽 분석',
-    // ⬇️ 외부 링크 대신 로컬 public 폴더의 영상 파일 경로 지정
-    video_url: '/test.mp4', 
+    title: '뚝섬 렛지 노즈그라인드 완벽 분석 (미리보기)',
+    video_url: '/test.mp4',
     rider_name: '김보더',
     rider_instagram: 'skater_kim',
     spot_name: '뚝섬 X-게임장',
     trick_name: '노즈그라인드'
   };
 
-  // DB 데이터 시도
-  const { data: videos } = await supabase.from('videos').select('*');
+  // Supabase DB에서 비디오 목록 가져오기 (단순 전체 조회)
+  const { data: videos, error } = await supabase.from('videos').select('*');
+
+  if (error) {
+    console.error('❌ Supabase 조회 에러:', error.message);
+  }
+
+  // DB 데이터가 성공적으로 있으면 첫 번째 비디오 사용, 없으면 defaultVideo 사용
   const hasDbData = videos && videos.length > 0;
   const currentVideo = hasDbData ? videos[0] : defaultVideo;
 
   return (
     <main className="min-h-screen bg-slate-950 text-white p-4 flex flex-col items-center justify-start max-w-md mx-auto">
-      {/* DB 연결 상태 안내 바 */}
-      <div className="w-full mb-2">
+      {/* DB 연결 상태 안내 상태바 */}
+      <div className="w-full mb-2 flex justify-end">
         {hasDbData ? (
-          <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full border border-green-500/30">
-            🟢 DB 연동 성공
+          <span className="text-[10px] bg-green-500/20 text-green-400 px-2.5 py-1 rounded-full font-bold border border-green-500/30">
+            🟢 DB 연결 성공
           </span>
         ) : (
-          <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full border border-yellow-500/30">
-            🟡 미리보기 모드 (DB 데이터 읽는 중)
+          <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2.5 py-1 rounded-full font-bold border border-yellow-500/30">
+            🟡 미리보기 모드 (DB 조회 중/실패)
           </span>
         )}
       </div>
