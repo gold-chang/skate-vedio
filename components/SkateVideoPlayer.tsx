@@ -99,3 +99,28 @@ export default function SkateVideoPlayer({ src }: SkateVideoPlayerProps) {
         <div className="flex items-center justify-between text-white text-xs">
           <div className="flex items-center gap-2">
             <button
+              onClick={togglePlay}
+              className="p-1.5 hover:bg-white/20 rounded-full transition"
+            >
+              {isPlaying ? <Pause size={18} /> : <Play size={18} className="fill-white" />}
+            </button>
+
+            <button
+              onClick={handleRestart}
+              className="p-1.5 hover:bg-white/20 rounded-full transition text-white/80 hover:text-white"
+            >
+              <RotateCcw size={16} />
+            </button>
+          </div>
+
+          <button
+            onClick={toggleMute}
+            className="p-1.5 hover:bg-white/20 rounded-full transition text-white/80 hover:text-white"
+          >
+            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
