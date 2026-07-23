@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, use } from 'react';
+import { useRouter } from 'next/navigation'; // 🚀 이전 위치 및 필터 유지를 위한 useRouter 추가
 import { supabase } from '../../../lib/supabase';
 import SkateVideoPlayer from '../../../components/SkateVideoPlayer';
 import { ArrowLeft, Heart, MessageSquare, Send, User, ChevronRight } from 'lucide-react';
@@ -14,6 +15,7 @@ interface Comment {
 }
 
 export default function VideoDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter(); // 🚀 router 인스턴스 생성
   const resolvedParams = use(params);
   const videoId = resolvedParams.id;
 
@@ -137,9 +139,9 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
     return (
       <main className="min-h-screen bg-[#f7f4ef] flex flex-col items-center justify-center text-xs text-[#8c8275] gap-3">
         <span>영상을 찾을 수 없습니다.</span>
-        <Link href="/" className="text-[#a88963] font-bold underline">
-          메인으로 돌아가기
-        </Link>
+        <button onClick={() => router.back()} className="text-[#a88963] font-bold underline cursor-pointer">
+          이전으로 돌아가기
+        </button>
       </main>
     );
   }
@@ -150,14 +152,14 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-4 flex flex-col items-center max-w-md mx-auto pb-16 font-sans antialiased">
-      {/* 상단 네비게이션 */}
+      {/* 🚀 상단 네비게이션 - router.back() 적용 */}
       <div className="w-full my-3 flex items-center justify-between">
-        <Link
-          href="/"
-          className="flex items-center gap-1 text-xs font-semibold text-[#8c8275] hover:text-[#3d332a] transition"
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-1 text-xs font-semibold text-[#8c8275] hover:text-[#3d332a] transition cursor-pointer"
         >
           <ArrowLeft size={16} /> 목록으로
-        </Link>
+        </button>
         <span className="text-xs font-bold text-[#7a5c38]">스케이트보드 로그</span>
       </div>
 
@@ -166,15 +168,15 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
         <SkateVideoPlayer src={video.video_url} />
       </div>
 
-      {/* 🚀 영상 플레이어와 제목 사이의 [목록으로] 버튼 */}
+      {/* 🚀 영상 플레이어 하단 [목록으로 돌아가기] 버튼 - router.back() 적용 */}
       <div className="w-full mb-3 flex justify-end">
-        <Link
-          href="/"
-          className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#3d332a] text-[#f7f4ef] hover:bg-[#2c231a] rounded-2xl text-xs font-bold transition shadow-2xs active:scale-[0.98]"
+        <button
+          onClick={() => router.back()}
+          className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#3d332a] text-[#f7f4ef] hover:bg-[#2c231a] rounded-2xl text-xs font-bold transition shadow-2xs active:scale-[0.98] cursor-pointer"
         >
           <ArrowLeft size={16} />
           <span>목록으로 돌아가기</span>
-        </Link>
+        </button>
       </div>
 
       {/* 상세 정보 카드 */}
@@ -184,7 +186,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
           <button
             onClick={handleLike}
             disabled={hasLiked}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs font-bold transition flex-shrink-0 ${
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs font-bold transition flex-shrink-0 cursor-pointer ${
               hasLiked
                 ? 'bg-[#e04f5f] text-white border-[#e04f5f]'
                 : 'bg-[#f7f4ef] text-[#e04f5f] border-[#e8e2d8] hover:border-[#e04f5f]'
@@ -307,7 +309,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
             <button
               type="submit"
               disabled={isSubmitting}
-              className="bg-[#3d332a] hover:bg-[#2c231a] disabled:bg-[#c2bbb0] text-white px-4 rounded-2xl flex items-center justify-center transition shadow-sm active:scale-95 flex-shrink-0"
+              className="bg-[#3d332a] hover:bg-[#2c231a] disabled:bg-[#c2bbb0] text-white px-4 rounded-2xl flex items-center justify-center transition shadow-sm active:scale-95 flex-shrink-0 cursor-pointer"
             >
               <Send size={15} />
             </button>
