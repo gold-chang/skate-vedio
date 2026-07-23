@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { supabase } from '../lib/supabase';
 import { Settings, Trophy, TrendingUp, Clock } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import VideoGrid from '../components/VideoGrid';
 
 interface PageProps {
@@ -75,12 +76,17 @@ export default async function Home({ searchParams }: PageProps) {
 
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-3 flex flex-col items-center justify-start max-w-md mx-auto pb-12 font-sans antialiased">
-      {/* 🚀 상단 헤더 - SKClip 텍스트 로고 적용 */}
+      {/* 🚀 상단 헤더 - 로고 이미지 적용 */}
       <div className="w-full my-2 flex items-center justify-between">
         <Link href="/" className="flex items-center active:scale-95 transition">
-          <span className="text-xl font-extrabold tracking-tight text-[#3d332a]">
-            SK<span className="text-[#a88963]">Clip</span>
-          </span>
+          <Image
+            src="/logo.png"
+            alt="SKClip Logo"
+            width={110}
+            height={36}
+            className="h-8 w-auto object-contain"
+            priority
+          />
         </Link>
         <Link
           href="/admin"
@@ -116,7 +122,7 @@ export default async function Home({ searchParams }: PageProps) {
           </Link>
         </div>
 
-        {/* 샘플 필터 칩 목록 */}
+        {/* 샘플 필터 칩 목록 (스팟 / 기술 / 보더) */}
         <div className="flex flex-col gap-1.5">
           {sampleSpots.length > 0 && (
             <div className="flex items-center gap-1 flex-wrap">
