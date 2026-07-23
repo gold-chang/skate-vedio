@@ -90,7 +90,9 @@ export default function SkateVideoPlayer({ src }: SkateVideoPlayerProps) {
         <video
           ref={videoRef}
           src={src}
-          playsInline
+            autoPlay  // 🚀 자동 재생
+            muted     // 🚀 모바일 자동 재생 정책을 위한 음소거 (필수)
+            playsInline // 🚀 iOS에서 전체화면으로 튕기지 않고 재생되도록 설정
           className="w-full h-full object-contain cursor-pointer"
           onClick={togglePlay}
           onPlay={() => setIsPlaying(true)}

@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Settings, Trophy, TrendingUp, Clock } from 'lucide-react';
 import Link from 'next/link';
 import VideoGrid from '../components/VideoGrid';
-import ShareButton from '../components/ShareButton';
+import ShareButton from '@/components/ShareButton';
 
 interface PageProps {
   searchParams: Promise<{ spot?: string; trick?: string; rider?: string; type?: string; sort?: string }>;
