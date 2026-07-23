@@ -1,10 +1,10 @@
-export const dynamic = 'force-dynamic';
+export const revalidate = 60; // 🚀 60초 캐싱(ISR) 적용으로 메인 로딩 속도 최적화
 
 import { supabase } from '../lib/supabase';
 import { Settings, Trophy, TrendingUp, Clock } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
 import VideoGrid from '../components/VideoGrid';
+import ShareButton from '../components/ShareButton';
 
 interface PageProps {
   searchParams: Promise<{ spot?: string; trick?: string; rider?: string; type?: string; sort?: string }>;
@@ -20,7 +20,7 @@ export default async function Home({ searchParams }: PageProps) {
 
   let orderByField = sortType === 'recent' ? 'created_at' : 'likes';
 
-  // 초기 20개 가져오기
+  // 🚀 초기 10개만 불러오고, 필요한 컬럼만 선택하여 DB 응답 속도 극대화
   const { data: rawVideos } = await supabase
     .from('videos')
     .select(`
@@ -29,13 +29,13 @@ export default async function Home({ searchParams }: PageProps) {
       video_url,
       likes,
       created_at,
-      riders ( name, instagram, rider_type ),
-      spots ( name, location_name ),
-      tricks ( name, difficulty ),
-      video_tricks ( tricks ( name, difficulty ) )
+      riders!inner(name, rider_type),
+      spots(name),
+      tricks(name),
+      video_tricks(tricks(name))
     `)
     .order(orderByField, { ascending: false })
-    .range(0, 19);
+    .range(0, 9);
 
   const allVideos = (rawVideos || []).map((v: any) => {
     let multiTricks: any[] = [];
@@ -76,24 +76,26 @@ export default async function Home({ searchParams }: PageProps) {
 
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-3 flex flex-col items-center justify-start max-w-md mx-auto pb-12 font-sans antialiased">
-      {/* 🚀 상단 헤더 - 로고 이미지 적용 */}
+      {/* 🚀 상단 헤더 - SKClip 텍스트 로고 & 공유/관리자 버튼 */}
       <div className="w-full my-2 flex items-center justify-between">
         <Link href="/" className="flex items-center active:scale-95 transition">
-          <Image
-            src="/logo.png"
-            alt="SKClip Logo"
-            width={110}
-            height={36}
-            className="h-8 w-auto object-contain"
-            priority
-          />
+          <span className="text-xl font-extrabold tracking-tight text-[#3d332a]">
+            SK<span className="text-[#a88963]">Clip</span>
+          </span>
         </Link>
-        <Link
-          href="/admin"
-          className="flex items-center gap-1 text-[11px] bg-white border border-[#e8e2d8] text-[#6e6355] hover:text-[#3d332a] px-3 py-1.5 rounded-full transition shadow-2xs font-medium"
-        >
-          <Settings size={13} /> 관리자
-        </Link>
+        
+        <div className="flex items-center gap-1.5">
+          {/* 공유 버튼 */}
+          <ShareButton />
+
+          {/* 관리자 버튼 */}
+          <Link
+            href="/admin"
+            className="flex items-center gap-1 text-[11px] bg-white border border-[#e8e2d8] text-[#6e6355] hover:text-[#3d332a] px-3 py-1.5 rounded-full transition shadow-2xs font-medium"
+          >
+            <Settings size={13} /> 관리자
+          </Link>
+        </div>
       </div>
 
       {/* 필터 영역 */}
