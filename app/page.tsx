@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { supabase } from '../lib/supabase';
 import { Settings, Trophy, TrendingUp, Clock } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import VideoGrid from '../components/VideoGrid';
 
 interface PageProps {
@@ -75,11 +76,18 @@ export default async function Home({ searchParams }: PageProps) {
 
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-3 flex flex-col items-center justify-start max-w-md mx-auto pb-12 font-sans antialiased">
-      {/* 헤더 */}
+      {/* 🚀 상단 헤더 - 로고 이미지 적용 */}
       <div className="w-full my-2 flex items-center justify-between">
-        <span className="text-base font-black tracking-wide text-[#7a5c38]">
-          🛹 스케이트보드 로그
-        </span>
+        <Link href="/" className="flex items-center active:scale-95 transition">
+          <Image
+            src="/logo.png"
+            alt="SKClip Logo"
+            width={110}
+            height={36}
+            className="h-8 w-auto object-contain"
+            priority
+          />
+        </Link>
         <Link
           href="/admin"
           className="flex items-center gap-1 text-[11px] bg-white border border-[#e8e2d8] text-[#6e6355] hover:text-[#3d332a] px-3 py-1.5 rounded-full transition shadow-2xs font-medium"
@@ -154,7 +162,6 @@ export default async function Home({ searchParams }: PageProps) {
             </div>
           )}
 
-          {/* 🚀 복구된 보더(스케이터) 필터 라인 */}
           {sampleRiders.length > 0 && (
             <div className="flex items-center gap-1 flex-wrap">
               <span className="text-[10px] text-[#a09587] font-bold mr-0.5">보더</span>

@@ -38,7 +38,6 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
   const fetchVideoAndComments = async () => {
     setLoading(true);
 
-    // 1. 비디오 상세 및 복수 기술(video_tricks) 조회
     const { data: videoData } = await supabase
       .from('videos')
       .select(`
@@ -56,7 +55,6 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
       .single();
 
     if (videoData) {
-      // 복수 기술 가공
       const multiTricks = videoData.video_tricks && videoData.video_tricks.length > 0
         ? videoData.video_tricks.map((vt: any) => vt.tricks).filter(Boolean)
         : (videoData.tricks ? [videoData.tricks] : []);
@@ -65,7 +63,6 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
       setLikes(videoData.likes || 0);
     }
 
-    // 2. 댓글 목록 조회
     const { data: commentsData } = await supabase
       .from('comments')
       .select('*')
@@ -152,7 +149,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
   const tricksList = video.tricksList || [];
 
   return (
-    <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-4 flex flex-col items-center max-w-md mx-auto pb-12 font-sans antialiased">
+    <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-4 flex flex-col items-center max-w-md mx-auto pb-16 font-sans antialiased">
       {/* 상단 네비게이션 */}
       <div className="w-full my-3 flex items-center justify-between">
         <Link
@@ -165,11 +162,22 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* 비디오 플레이어 */}
-      <div className="w-full mb-4">
+      <div className="w-full mb-3">
         <SkateVideoPlayer src={video.video_url} />
       </div>
 
-      {/* 상세 정보 카드 (클릭 가능한 칩 스타일 적용) */}
+      {/* 🚀 영상 플레이어와 제목 사이의 [목록으로] 버튼 */}
+      <div className="w-full mb-3 flex justify-end">
+        <Link
+          href="/"
+          className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#3d332a] text-[#f7f4ef] hover:bg-[#2c231a] rounded-2xl text-xs font-bold transition shadow-2xs active:scale-[0.98]"
+        >
+          <ArrowLeft size={16} />
+          <span>목록으로 돌아가기</span>
+        </Link>
+      </div>
+
+      {/* 상세 정보 카드 */}
       <div className="w-full bg-white border border-[#e8e2d8] rounded-3xl p-5 shadow-sm flex flex-col gap-4 mb-5">
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-base font-bold text-[#2c2825] leading-snug">{video.title}</h1>
@@ -188,13 +196,13 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div className="flex flex-col gap-3 border-t border-[#f0ebd9] pt-3 text-xs">
-          {/* 스팟 클릭 가능한 칩 */}
+          {/* 스팟 */}
           <div className="flex justify-between items-center">
             <span className="text-[#8c8275] font-medium min-w-[60px]">📍 스팟</span>
             {spot?.name ? (
               <Link
                 href={`/?spot=${encodeURIComponent(spot.name)}`}
-                className="flex items-center gap-1 bg-[#f0ebd9] text-[#7a5c38] hover:bg-[#e4ddc7] px-3 py-1.5 rounded-xl font-bold transition shadow-2xs border border-[#e4ddc7] active:scale-95"
+                className="flex items-center gap-1 bg-[#f0ebd9] text-[#7a5c38] hover:bg-[#e4ddc7] px-3 py-1.5 rounded-xl font-bold transition border border-[#e4ddc7] active:scale-95"
               >
                 <span>{spot.name}</span>
                 <ChevronRight size={13} />
@@ -204,7 +212,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
             )}
           </div>
 
-          {/* 복수 기술 클릭 가능한 개별 칩들 */}
+          {/* 기술 */}
           <div className="flex justify-between items-start gap-2">
             <span className="text-[#8c8275] font-medium min-w-[60px] pt-1.5">🛹 기술</span>
             <div className="flex flex-wrap justify-end gap-1.5">
@@ -213,7 +221,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
                   <Link
                     key={idx}
                     href={`/?trick=${encodeURIComponent(t.name)}`}
-                    className="flex items-center gap-0.5 bg-[#f0ebd9] text-[#7a5c38] hover:bg-[#e4ddc7] px-3 py-1.5 rounded-xl font-bold transition shadow-2xs border border-[#e4ddc7] active:scale-95"
+                    className="flex items-center gap-0.5 bg-[#f0ebd9] text-[#7a5c38] hover:bg-[#e4ddc7] px-3 py-1.5 rounded-xl font-bold transition border border-[#e4ddc7] active:scale-95"
                   >
                     <span>{t.name}</span>
                     <ChevronRight size={13} />
@@ -225,13 +233,13 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
 
-          {/* 스케이터 클릭 가능한 칩 */}
+          {/* 스케이터 */}
           <div className="flex justify-between items-center">
             <span className="text-[#8c8275] font-medium min-w-[60px]">👤 스케이터</span>
             {rider?.name ? (
               <Link
                 href={`/?rider=${encodeURIComponent(rider.name)}`}
-                className="flex items-center gap-1 bg-[#f0ebd9] text-[#7a5c38] hover:bg-[#e4ddc7] px-3 py-1.5 rounded-xl font-bold transition shadow-2xs border border-[#e4ddc7] active:scale-95"
+                className="flex items-center gap-1 bg-[#f0ebd9] text-[#7a5c38] hover:bg-[#e4ddc7] px-3 py-1.5 rounded-xl font-bold transition border border-[#e4ddc7] active:scale-95"
               >
                 <span>
                   {rider.name} {rider.rider_type === '프로' && '🏆'}
