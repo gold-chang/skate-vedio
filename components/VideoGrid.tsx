@@ -40,7 +40,7 @@ export default function VideoGrid({
     if (isLoading || !hasMore) return;
     setIsLoading(true);
 
-    const PAGE_SIZE = 20;
+    const PAGE_SIZE = 10;
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 

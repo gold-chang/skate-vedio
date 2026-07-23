@@ -1,9 +1,10 @@
-export const revalidate = 60; // 🚀 60초 캐싱(ISR) 적용으로 메인 로딩 속도 최적화
+export const revalidate = 60; // 60초 캐싱(ISR) 적용
 
-import { supabase } from '../lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { Settings, Trophy, TrendingUp, Clock } from 'lucide-react';
 import Link from 'next/link';
-import VideoGrid from '../components/VideoGrid';
+import Image from 'next/image';
+import VideoGrid from '@/components/VideoGrid';
 import ShareButton from '@/components/ShareButton';
 
 interface PageProps {
@@ -20,7 +21,8 @@ export default async function Home({ searchParams }: PageProps) {
 
   let orderByField = sortType === 'recent' ? 'created_at' : 'likes';
 
-  // 🚀 초기 10개만 불러오고, 필요한 컬럼만 선택하여 DB 응답 속도 극대화
+  // 🚀 !inner 구문을 제거(LEFT JOIN)하여 라이더 정보가 없는 영상도 정상 로드되도록 수정
+  // 🚀 초기 20개를 가져와 무한 스크롤 컴포넌트에 전달
   const { data: rawVideos } = await supabase
     .from('videos')
     .select(`
@@ -29,13 +31,13 @@ export default async function Home({ searchParams }: PageProps) {
       video_url,
       likes,
       created_at,
-      riders!inner(name, rider_type),
+      riders(name, rider_type),
       spots(name),
       tricks(name),
       video_tricks(tricks(name))
     `)
     .order(orderByField, { ascending: false })
-    .range(0, 9);
+    .range(0, 19);
 
   const allVideos = (rawVideos || []).map((v: any) => {
     let multiTricks: any[] = [];
@@ -76,19 +78,21 @@ export default async function Home({ searchParams }: PageProps) {
 
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-3 flex flex-col items-center justify-start max-w-md mx-auto pb-12 font-sans antialiased">
-      {/* 🚀 상단 헤더 - SKClip 텍스트 로고 & 공유/관리자 버튼 */}
+      {/* 상단 헤더 */}
       <div className="w-full my-2 flex items-center justify-between">
         <Link href="/" className="flex items-center active:scale-95 transition">
-          <span className="text-xl font-extrabold tracking-tight text-[#3d332a]">
-            SK<span className="text-[#a88963]">Clip</span>
-          </span>
+          <Image
+            src="/logo.png"
+            alt="SKClip Logo"
+            width={110}
+            height={36}
+            className="h-8 w-auto object-contain"
+            priority
+          />
         </Link>
         
         <div className="flex items-center gap-1.5">
-          {/* 공유 버튼 */}
           <ShareButton />
-
-          {/* 관리자 버튼 */}
           <Link
             href="/admin"
             className="flex items-center gap-1 text-[11px] bg-white border border-[#e8e2d8] text-[#6e6355] hover:text-[#3d332a] px-3 py-1.5 rounded-full transition shadow-2xs font-medium"
@@ -124,7 +128,7 @@ export default async function Home({ searchParams }: PageProps) {
           </Link>
         </div>
 
-        {/* 샘플 필터 칩 목록 (스팟 / 기술 / 보더) */}
+        {/* 샘플 필터 칩 목록 */}
         <div className="flex flex-col gap-1.5">
           {sampleSpots.length > 0 && (
             <div className="flex items-center gap-1 flex-wrap">
@@ -211,7 +215,7 @@ export default async function Home({ searchParams }: PageProps) {
         </Link>
       </div>
 
-      {/* 2열 그리드 영상 목록 */}
+      {/* 2열 그리드 영상 목록 및 무한 스크롤 */}
       <section className="w-full">
         <VideoGrid
           initialVideos={filteredVideos}
