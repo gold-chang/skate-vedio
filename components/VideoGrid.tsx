@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Heart, Trophy } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface VideoGridProps {
   initialVideos?: any[];
@@ -22,6 +23,7 @@ export default function VideoGrid({
   filterType = '',
   sortType = 'likes',
 }: VideoGridProps) {
+  const router = useRouter();
   const safeInitialVideos = Array.isArray(initialVideos) ? initialVideos : [];
 
   const [videos, setVideos] = useState<any[]>(safeInitialVideos);
@@ -122,13 +124,11 @@ export default function VideoGrid({
         setHasMore(false);
       }
 
-      // 🚀 [핵심 해결책] 중복 ID 제거 로직 추가
       setVideos((prev) => {
         const currentList = Array.isArray(prev) ? prev : [];
         const existingIds = new Set(currentList.map((item) => item.id));
         const newUniqueVideos = filtered.filter((item) => !existingIds.has(item.id));
 
-        // 새로 추가할 고유 영상이 더 이상 없으면 무한 스크롤 중단
         if (newUniqueVideos.length === 0) {
           setHasMore(false);
           return currentList;
@@ -162,6 +162,16 @@ export default function VideoGrid({
     return () => observer.disconnect();
   }, [hasMore, isLoading, page]);
 
+  // 🚀 칩 클릭 시 영상 상세 이동 차단 및 필터 적용 함수
+  const handleFilterClick = (e: React.MouseEvent, type: 'spot' | 'trick' | 'rider', value: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const searchParams = new URLSearchParams(window.location.search);
+    searchParams.set(type, value);
+    router.push(`/?${searchParams.toString()}`);
+  };
+
   if (!videos || !Array.isArray(videos) || (videos?.length ?? 0) === 0) {
     return (
       <div className="py-12 text-center text-[#8c8275] text-xs font-medium">
@@ -193,45 +203,57 @@ export default function VideoGrid({
                 playsInline
               />
 
-              <div className="absolute top-0 inset-x-0 p-2 flex items-center justify-between bg-gradient-to-b from-black/60 via-transparent to-transparent">
+              {/* 상단 프로 & 좋아요 라벨 */}
+              <div className="absolute top-0 inset-x-0 p-2.5 flex items-center justify-between bg-gradient-to-b from-black/60 via-transparent to-transparent pointer-events-none">
                 {r?.rider_type === '프로' ? (
-                  <div className="bg-amber-600/90 backdrop-blur-md px-1.5 py-0.5 rounded-md text-white text-[9px] font-extrabold shadow-2xs flex items-center gap-0.5">
-                    <Trophy size={9} /> PRO
+                  <div className="bg-amber-600/90 backdrop-blur-md px-2 py-0.5 rounded-md text-white text-[10px] font-extrabold shadow-2xs flex items-center gap-0.5 pointer-events-auto">
+                    <Trophy size={10} /> PRO
                   </div>
                 ) : (
                   <div />
                 )}
 
-                <div className="bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-full border border-white/20 flex items-center gap-0.5 text-white text-[10px] font-bold shadow-2xs ml-auto">
-                  <Heart size={10} className="fill-rose-500 text-rose-500" />
+                <div className="bg-black/40 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/20 flex items-center gap-1 text-white text-[11px] font-bold shadow-2xs ml-auto pointer-events-auto">
+                  <Heart size={11} className="fill-rose-500 text-rose-500" />
                   <span>{item.likes || 0}</span>
                 </div>
               </div>
 
-              <div className="absolute bottom-0 inset-x-0 p-2.5 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col gap-1">
-                <div className="flex items-center gap-1 flex-wrap">
+              {/* 🚀 하단 칩 태그 영역 (클릭 시 이벤트 전파 방지 + 필터 동작) */}
+              <div className="absolute bottom-0 inset-x-0 p-2.5 bg-gradient-to-t from-black/85 via-black/40 to-transparent flex flex-col gap-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {s?.name && (
-                    <span className="text-[9px] bg-white/90 backdrop-blur-md text-[#3d332a] font-extrabold px-1.5 py-0.5 rounded-md shadow-2xs truncate max-w-[85px]">
+                    <button
+                      type="button"
+                      onClick={(e) => handleFilterClick(e, 'spot', s.name)}
+                      className="text-[11px] bg-white/95 backdrop-blur-md text-[#2c2825] hover:bg-white font-black px-2.5 py-1 rounded-lg shadow-sm truncate max-w-[110px] transition active:scale-95 cursor-pointer"
+                    >
                       📍 {s.name}
-                    </span>
+                    </button>
                   )}
 
                   {tricks.map((t: any, idx: number) => {
                     if (!t || !t.name) return null;
                     return (
-                      <span
+                      <button
                         key={idx}
-                        className="text-[9px] bg-[#f0ebd9]/95 backdrop-blur-md text-[#7a5c38] font-extrabold px-1.5 py-0.5 rounded-md shadow-2xs truncate max-w-[85px]"
+                        type="button"
+                        onClick={(e) => handleFilterClick(e, 'trick', t.name)}
+                        className="text-[11px] bg-[#f0ebd9]/95 backdrop-blur-md text-[#664b2a] hover:bg-[#f0ebd9] font-black px-2.5 py-1 rounded-lg shadow-sm truncate max-w-[110px] transition active:scale-95 cursor-pointer"
                       >
                         🛹 {t.name}
-                      </span>
+                      </button>
                     );
                   })}
 
                   {r?.name && (
-                    <span className="text-[9px] bg-white/90 backdrop-blur-md text-[#3d332a] font-extrabold px-1.5 py-0.5 rounded-md shadow-2xs truncate max-w-[85px]">
+                    <button
+                      type="button"
+                      onClick={(e) => handleFilterClick(e, 'rider', r.name)}
+                      className="text-[11px] bg-white/95 backdrop-blur-md text-[#2c2825] hover:bg-white font-black px-2.5 py-1 rounded-lg shadow-sm truncate max-w-[110px] transition active:scale-95 cursor-pointer"
+                    >
                       👤 {r.name}
-                    </span>
+                    </button>
                   )}
                 </div>
               </div>
