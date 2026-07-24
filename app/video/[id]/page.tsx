@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useEffect, useState, use } from 'react';
-import { useRouter } from 'next/navigation'; // 🚀 이전 위치 및 필터 유지를 위한 useRouter 추가
-import { supabase } from '../../../lib/supabase';
-import SkateVideoPlayer from '../../../components/SkateVideoPlayer';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import SkateVideoPlayer from '@/components/SkateVideoPlayer';
+import ShareButton from '@/components/ShareButton';
 import { ArrowLeft, Heart, MessageSquare, Send, User, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface Comment {
   id: number;
@@ -15,9 +17,11 @@ interface Comment {
 }
 
 export default function VideoDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const router = useRouter(); // 🚀 router 인스턴스 생성
+  const router = useRouter();
+  
+  // Next.js params 안전 해제
   const resolvedParams = use(params);
-  const videoId = resolvedParams.id;
+  const videoId = resolvedParams?.id;
 
   const [video, setVideo] = useState<any>(null);
   const [likes, setLikes] = useState<number>(0);
@@ -34,52 +38,67 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
     const savedNickname = localStorage.getItem('skate_nickname');
     if (savedNickname) setNickname(savedNickname);
 
-    fetchVideoAndComments();
+    if (videoId) {
+      fetchVideoAndComments();
+    }
   }, [videoId]);
 
   const fetchVideoAndComments = async () => {
     setLoading(true);
 
-    const { data: videoData } = await supabase
-      .from('videos')
-      .select(`
-        id,
-        title,
-        video_url,
-        likes,
-        created_at,
-        riders ( name, instagram, rider_type ),
-        spots ( name, location_name ),
-        tricks ( name, difficulty ),
-        video_tricks ( tricks ( name, difficulty ) )
-      `)
-      .eq('id', videoId)
-      .single();
+    try {
+      const { data: videoData, error } = await supabase
+        .from('videos')
+        .select(`
+          id,
+          title,
+          video_url,
+          likes,
+          created_at,
+          riders ( name, instagram, rider_type ),
+          spots ( name, location_name ),
+          tricks ( name, difficulty ),
+          video_tricks ( tricks ( name, difficulty ) )
+        `)
+        .eq('id', videoId)
+        .maybeSingle();
 
-    if (videoData) {
-      const multiTricks = videoData.video_tricks && videoData.video_tricks.length > 0
-        ? videoData.video_tricks.map((vt: any) => vt.tricks).filter(Boolean)
-        : (videoData.tricks ? [videoData.tricks] : []);
+      if (error) {
+        console.error('비디오 로드 오류:', error);
+      }
 
-      setVideo({ ...videoData, tricksList: multiTricks });
-      setLikes(videoData.likes || 0);
+      if (videoData) {
+        let multiTricks: any[] = [];
+        if (videoData.video_tricks && Array.isArray(videoData.video_tricks) && videoData.video_tricks.length > 0) {
+          multiTricks = videoData.video_tricks.map((vt: any) => vt?.tricks).filter(Boolean);
+        }
+        if (multiTricks.length === 0 && videoData.tricks) {
+          multiTricks = Array.isArray(videoData.tricks) ? videoData.tricks : [videoData.tricks];
+        }
+
+        setVideo({ ...videoData, tricksList: multiTricks });
+        setLikes(videoData.likes || 0);
+      }
+
+      // 댓글 로드
+      const { data: commentsData } = await supabase
+        .from('comments')
+        .select('*')
+        .eq('video_id', videoId)
+        .order('created_at', { ascending: false });
+
+      if (commentsData && Array.isArray(commentsData)) {
+        setComments(commentsData);
+      }
+    } catch (err) {
+      console.error('데이터 불러오기 중 예외 발생:', err);
+    } finally {
+      setLoading(false);
     }
-
-    const { data: commentsData } = await supabase
-      .from('comments')
-      .select('*')
-      .eq('video_id', videoId)
-      .order('created_at', { ascending: false });
-
-    if (commentsData) {
-      setComments(commentsData);
-    }
-
-    setLoading(false);
   };
 
   const handleLike = async () => {
-    if (hasLiked) return;
+    if (hasLiked || !videoId) return;
 
     const newLikes = likes + 1;
     setLikes(newLikes);
@@ -118,19 +137,20 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
       .single();
 
     if (error) {
-      alert('댓글 작성 중 오류가 발생했습니다: ' + error.message);
+      alert('댓글 작성 실패: ' + error.message);
     } else if (data) {
-      setComments([data, ...comments]);
+      setComments([data, ...(comments || [])]);
       setCommentContent('');
     }
 
     setIsSubmitting(false);
   };
 
+  // 🚀 [에러 원천 차단] 로딩 중이거나 비디오가 없을 때 즉시 리턴하여 length 접근 막음
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f7f4ef] flex items-center justify-center text-xs text-[#8c8275]">
-        로딩 중...
+        영상을 불러오는 중...
       </main>
     );
   }
@@ -140,7 +160,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
       <main className="min-h-screen bg-[#f7f4ef] flex flex-col items-center justify-center text-xs text-[#8c8275] gap-3">
         <span>영상을 찾을 수 없습니다.</span>
         <button onClick={() => router.back()} className="text-[#a88963] font-bold underline cursor-pointer">
-          이전으로 돌아가기
+          목록으로 돌아가기
         </button>
       </main>
     );
@@ -148,11 +168,11 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
 
   const rider = Array.isArray(video.riders) ? video.riders[0] : video.riders;
   const spot = Array.isArray(video.spots) ? video.spots[0] : video.spots;
-  const tricksList = video.tricksList || [];
+  const tricksList = Array.isArray(video.tricksList) ? video.tricksList : [];
 
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-4 flex flex-col items-center max-w-md mx-auto pb-16 font-sans antialiased">
-      {/* 🚀 상단 네비게이션 - router.back() 적용 */}
+      {/* 상단 네비게이션 헤더 */}
       <div className="w-full my-3 flex items-center justify-between">
         <button
           onClick={() => router.back()}
@@ -160,15 +180,29 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
         >
           <ArrowLeft size={16} /> 목록으로
         </button>
-        <span className="text-xs font-bold text-[#7a5c38]">스케이트보드 로그</span>
+
+        {/* 상단 메인 로고 */}
+        <Link href="/" className="flex items-center active:scale-95 transition">
+          <Image
+            src="/logo.png"
+            alt="SKClip Logo"
+            width={90}
+            height={30}
+            className="h-7 w-auto object-contain"
+            priority
+          />
+        </Link>
+
+        {/* 공유 버튼 */}
+        <ShareButton />
       </div>
 
       {/* 비디오 플레이어 */}
       <div className="w-full mb-3">
-        <SkateVideoPlayer src={video.video_url} />
+        <SkateVideoPlayer src={video.video_url || ''} />
       </div>
 
-      {/* 🚀 영상 플레이어 하단 [목록으로 돌아가기] 버튼 - router.back() 적용 */}
+      {/* 하단 목록으로 버튼 */}
       <div className="w-full mb-3 flex justify-end">
         <button
           onClick={() => router.back()}
@@ -182,7 +216,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
       {/* 상세 정보 카드 */}
       <div className="w-full bg-white border border-[#e8e2d8] rounded-3xl p-5 shadow-sm flex flex-col gap-4 mb-5">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="text-base font-bold text-[#2c2825] leading-snug">{video.title}</h1>
+          <h1 className="text-base font-bold text-[#2c2825] leading-snug">{video.title || '제목 없음'}</h1>
           <button
             onClick={handleLike}
             disabled={hasLiked}
@@ -219,16 +253,19 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
             <span className="text-[#8c8275] font-medium min-w-[60px] pt-1.5">🛹 기술</span>
             <div className="flex flex-wrap justify-end gap-1.5">
               {tricksList.length > 0 ? (
-                tricksList.map((t: any, idx: number) => (
-                  <Link
-                    key={idx}
-                    href={`/?trick=${encodeURIComponent(t.name)}`}
-                    className="flex items-center gap-0.5 bg-[#f0ebd9] text-[#7a5c38] hover:bg-[#e4ddc7] px-3 py-1.5 rounded-xl font-bold transition border border-[#e4ddc7] active:scale-95"
-                  >
-                    <span>{t.name}</span>
-                    <ChevronRight size={13} />
-                  </Link>
-                ))
+                tricksList.map((t: any, idx: number) => {
+                  if (!t?.name) return null;
+                  return (
+                    <Link
+                      key={idx}
+                      href={`/?trick=${encodeURIComponent(t.name)}`}
+                      className="flex items-center gap-0.5 bg-[#f0ebd9] text-[#7a5c38] hover:bg-[#e4ddc7] px-3 py-1.5 rounded-xl font-bold transition border border-[#e4ddc7] active:scale-95"
+                    >
+                      <span>{t.name}</span>
+                      <ChevronRight size={13} />
+                    </Link>
+                  );
+                })
               ) : (
                 <span className="font-bold text-[#3d332a]">-</span>
               )}
@@ -274,7 +311,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
         <div className="flex items-center justify-between border-b border-[#f0ebd9] pb-3">
           <div className="flex items-center gap-1.5 text-xs font-bold text-[#3d332a]">
             <MessageSquare size={16} className="text-[#7a5c38]" />
-            <span>댓글 ({comments.length})</span>
+            <span>댓글 ({(comments || []).length})</span>
           </div>
         </div>
 
@@ -293,7 +330,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
               />
             </div>
             <span className="text-[10px] text-[#a09587] font-mono">
-              {commentContent.length}/100자
+              {(commentContent || '').length}/100자
             </span>
           </div>
 
@@ -318,7 +355,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
 
         {/* 댓글 목록 */}
         <div className="flex flex-col gap-3 mt-2">
-          {comments.length > 0 ? (
+          {comments && comments.length > 0 ? (
             comments.map((c) => {
               const cDate = c.created_at
                 ? new Date(c.created_at).toLocaleDateString('ko-KR', {
