@@ -33,6 +33,15 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
   const [commentContent, setCommentContent] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  // 🚀 [공유 링크 접속 대응] 이전 페이지 히스토리가 없으면 메인 홈(/)으로 이동
+  const handleGoBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer.includes(window.location.host)) {
+      router.back();
+    } else {
+      router.push('/');
+    }
+  };
+
   useEffect(() => {
     const savedNickname = localStorage.getItem('skate_nickname');
     if (savedNickname) setNickname(savedNickname);
@@ -156,7 +165,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
     return (
       <main className="min-h-screen bg-[#f7f4ef] flex flex-col items-center justify-center text-xs text-[#8c8275] gap-3">
         <span>영상을 찾을 수 없습니다.</span>
-        <button onClick={() => router.back()} className="text-[#a88963] font-bold underline cursor-pointer">
+        <button onClick={handleGoBack} className="text-[#a88963] font-bold underline cursor-pointer">
           목록으로 돌아가기
         </button>
       </main>
@@ -172,13 +181,13 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
       {/* 상단 네비게이션 헤더 */}
       <div className="w-full my-3 flex items-center justify-between">
         <button
-          onClick={() => router.back()}
+          onClick={handleGoBack}
           className="flex items-center gap-1 text-xs font-semibold text-[#8c8275] hover:text-[#3d332a] transition cursor-pointer"
         >
           <ArrowLeft size={16} /> 목록으로
         </button>
 
-        {/* 🚀 클릭 시 필터 초기화된 기본 메인 홈(/)으로 이동하는 로고 */}
+        {/* 상단 메인 로고 */}
         <Link href="/" className="flex items-center active:scale-95 transition">
           <Image
             src="/logo.png"
@@ -202,7 +211,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
       {/* 하단 목록으로 돌아가기 버튼 */}
       <div className="w-full mb-3 flex justify-end">
         <button
-          onClick={() => router.back()}
+          onClick={handleGoBack}
           className="flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#3d332a] text-[#f7f4ef] hover:bg-[#2c231a] rounded-2xl text-xs font-bold transition shadow-2xs active:scale-[0.98] cursor-pointer"
         >
           <ArrowLeft size={16} />
