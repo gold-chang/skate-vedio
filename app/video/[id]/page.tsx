@@ -19,7 +19,6 @@ interface Comment {
 export default function VideoDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   
-  // Next.js params 안전 해제
   const resolvedParams = use(params);
   const videoId = resolvedParams?.id;
 
@@ -80,7 +79,6 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
         setLikes(videoData.likes || 0);
       }
 
-      // 댓글 로드
       const { data: commentsData } = await supabase
         .from('comments')
         .select('*')
@@ -146,7 +144,6 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
     setIsSubmitting(false);
   };
 
-  // 🚀 [에러 원천 차단] 로딩 중이거나 비디오가 없을 때 즉시 리턴하여 length 접근 막음
   if (loading) {
     return (
       <main className="min-h-screen bg-[#f7f4ef] flex items-center justify-center text-xs text-[#8c8275]">
@@ -181,14 +178,14 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
           <ArrowLeft size={16} /> 목록으로
         </button>
 
-        {/* 상단 메인 로고 */}
+        {/* 🚀 클릭 시 필터 초기화된 기본 메인 홈(/)으로 이동하는 로고 */}
         <Link href="/" className="flex items-center active:scale-95 transition">
           <Image
             src="/logo.png"
             alt="SKClip Logo"
             width={90}
             height={30}
-            className="h-7 w-auto object-contain"
+            className="h-7 w-auto object-contain cursor-pointer"
             priority
           />
         </Link>
@@ -197,12 +194,12 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
         <ShareButton />
       </div>
 
-      {/* 비디오 플레이어 */}
+      {/* 비디오 플레이어 & 제어 컨트롤러 */}
       <div className="w-full mb-3">
         <SkateVideoPlayer src={video.video_url || ''} />
       </div>
 
-      {/* 하단 목록으로 버튼 */}
+      {/* 하단 목록으로 돌아가기 버튼 */}
       <div className="w-full mb-3 flex justify-end">
         <button
           onClick={() => router.back()}

@@ -1,4 +1,4 @@
-export const revalidate = 0; // 필터링 즉시 반영을 위해 캐시 방지
+export const revalidate = 0;
 
 import { supabase } from '@/lib/supabase';
 import { Settings, Trophy, TrendingUp, Clock, RotateCcw } from 'lucide-react';
@@ -22,7 +22,6 @@ export default async function Home({ searchParams }: PageProps) {
 
   let orderByField = sortType === 'recent' ? 'created_at' : 'likes';
 
-  // 전체 데이터 50개 조회
   const { data: rawVideos } = await supabase
     .from('videos')
     .select(`
@@ -51,7 +50,6 @@ export default async function Home({ searchParams }: PageProps) {
     return { ...v, tricksList: multiTricks || [] };
   }).filter(Boolean);
 
-  // 스팟/기술/보더 인기순 카운트
   const spotCounts: { [key: string]: number } = {};
   const trickCounts: { [key: string]: number } = {};
   const riderCounts: { [key: string]: number } = {};
@@ -75,29 +73,24 @@ export default async function Home({ searchParams }: PageProps) {
   const sampleTricks = Object.keys(trickCounts).sort((a, b) => trickCounts[b] - trickCounts[a]).slice(0, 8);
   const sampleRiders = Object.keys(riderCounts).sort((a, b) => riderCounts[b] - riderCounts[a]).slice(0, 8);
 
-  // 선택 필터 검증
   const filteredVideos = formattedAllVideos.filter((v: any) => {
     if (!v) return false;
     const rider = Array.isArray(v.riders) ? v.riders[0] : v.riders;
     const spot = Array.isArray(v.spots) ? v.spots[0] : v.spots;
     const tricks = Array.isArray(v.tricksList) ? v.tricksList : [];
 
-    // 1. 프로 전용 필터
     if (filterType && rider?.rider_type !== filterType) return false;
 
-    // 2. 스팟 필터
     if (filterSpots.length > 0) {
       if (!spot || !spot.name || !filterSpots.includes(spot.name)) return false;
     }
 
-    // 3. 기술 필터 (알리 포함)
     if (filterTricks.length > 0) {
       if (!tricks || tricks.length === 0) return false;
       const hasMatchingTrick = tricks.some((t: any) => t?.name && filterTricks.includes(t.name));
       if (!hasMatchingTrick) return false;
     }
 
-    // 4. 보더 필터
     if (filterRiders.length > 0) {
       if (!rider || !rider.name || !filterRiders.includes(rider.name)) return false;
     }
@@ -146,21 +139,20 @@ export default async function Home({ searchParams }: PageProps) {
   };
 
   const hasActiveFilter = filterSpots.length > 0 || filterTricks.length > 0 || filterRiders.length > 0 || Boolean(filterType);
-
-  // 알리 필터 활성화 여부
   const isOllieActive = filterTricks.includes('알리');
 
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-3 flex flex-col items-center justify-start max-w-md mx-auto pb-12 font-sans antialiased">
       {/* 상단 헤더 */}
       <div className="w-full my-2 flex items-center justify-between">
+        {/* 🚀 클릭 시 모든 필터가 초기화된 깨끗한 메인 홈(/)으로 이동하는 로고 */}
         <Link href="/" className="flex items-center active:scale-95 transition">
           <Image
             src="/logo.png"
             alt="SKClip Logo"
             width={110}
             height={36}
-            className="h-8 w-auto object-contain"
+            className="h-8 w-auto object-contain cursor-pointer"
             priority
           />
         </Link>
@@ -190,7 +182,7 @@ export default async function Home({ searchParams }: PageProps) {
           )}
         </div>
 
-        {/* 🚀 상단 퀵 필터 바 (프로 영상만 보기 & 알리 영상 모아보기) */}
+        {/* 🚀 퀵 필터 바 */}
         <div className="flex items-center gap-1.5 border-b border-[#f0ebd9] pb-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {/* 프로 전용 필터 */}
           <Link
