@@ -1,6 +1,6 @@
- 'use client';
+'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, Repeat } from 'lucide-react';
 
 interface SkateVideoPlayerProps {
@@ -15,8 +15,12 @@ export default function SkateVideoPlayer({ src, videoUrl }: SkateVideoPlayerProp
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [playbackRate, setPlaybackRate] = useState<number>(1.0);
   const [isLooping, setIsLooping] = useState<boolean>(true);
+  
+  // 비디오 시간 관리
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
 
-  // 속도 변경 처리
+  // 재생 속도 변경
   const handleSpeedChange = (speed: number) => {
     setPlaybackRate(speed);
     if (videoRef.current) {
@@ -43,20 +47,51 @@ export default function SkateVideoPlayer({ src, videoUrl }: SkateVideoPlayerProp
     }
   };
 
-  // 프레임 단위 이동 (약 1/30초 기준)
+  // 프레임 단위 이동 (1/30초 기준)
   const stepFrame = (frames: number) => {
     if (!videoRef.current) return;
     videoRef.current.pause();
     setIsPlaying(false);
     
-    const frameTime = 1 / 30; // 30fps 기준
-    videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime + frames * frameTime);
+    const frameTime = 1 / 30;
+    videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + frames * frameTime));
+  };
+
+  // 탐색 바 드래그 / 클릭 시 비디오 이동
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const time = parseFloat(e.target.value);
+    setCurrentTime(time);
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+    }
+  };
+
+  // 시간 업데이트 동기화
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+    }
+  };
+
+  // 메타데이터 로드 시 전체 시간 수집
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+    }
+  };
+
+  // 시간 포맷터 (예: 00:03)
+  const formatTime = (time: number) => {
+    if (isNaN(time)) return '00:00';
+    const mins = Math.floor(time / 60);
+    const secs = Math.floor(time % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
     <div className="w-full flex flex-col gap-2">
-      {/* 🎬 비디오 화면 */}
-      <div className="w-full relative rounded-3xl overflow-hidden bg-black aspect-[3/4] shadow-sm">
+      {/* 🎬 비디오 화면 + 우측 하단 플로팅 재생/일시정지 버튼 */}
+      <div className="w-full relative rounded-3xl overflow-hidden bg-black aspect-[3/4] shadow-sm group">
         <video
           ref={videoRef}
           src={finalUrl}
@@ -67,12 +102,46 @@ export default function SkateVideoPlayer({ src, videoUrl }: SkateVideoPlayerProp
           className="w-full h-full object-cover"
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={handleLoadedMetadata}
         />
+
+        {/* 🚀 영상 우측 하단 플로팅 재생/일시정지 버튼 */}
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="absolute bottom-3 right-3 bg-black/60 hover:bg-black/80 backdrop-blur-md text-white p-2.5 rounded-full border border-white/20 transition active:scale-90 cursor-pointer shadow-md flex items-center justify-center z-10"
+        >
+          {isPlaying ? (
+            <Pause size={18} className="fill-white" />
+          ) : (
+            <Play size={18} className="fill-white ml-0.5" />
+          )}
+        </button>
       </div>
 
-      {/* 🛠️ 비디오 하단 플레이 컨트롤 바 */}
+      {/* 🚀 빠른 구간 탐색 바 (Progress Bar) */}
+      <div className="w-full bg-white border border-[#e8e2d8] px-3 py-2 rounded-xl flex items-center gap-2 shadow-2xs">
+        <span className="text-[10px] font-mono text-[#8c8275] min-w-[32px]">
+          {formatTime(currentTime)}
+        </span>
+        <input
+          type="range"
+          min="0"
+          max={duration || 0}
+          step="0.01"
+          value={currentTime}
+          onChange={handleSeek}
+          className="w-full h-1.5 bg-[#f0ebd9] rounded-lg appearance-none cursor-pointer accent-[#3d332a]"
+        />
+        <span className="text-[10px] font-mono text-[#8c8275] min-w-[32px] text-right">
+          {formatTime(duration)}
+        </span>
+      </div>
+
+      {/* 🛠️ 하단 컨트롤러 칩 */}
       <div className="w-full bg-white border border-[#e8e2d8] p-2.5 rounded-2xl shadow-2xs flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
-        {/* 좌측: 속도 선택 칩 */}
+        {/* 속도 선택 칩 */}
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
@@ -109,9 +178,8 @@ export default function SkateVideoPlayer({ src, videoUrl }: SkateVideoPlayerProp
           </button>
         </div>
 
-        {/* 우측: 살짝 뒤로, 살짝 앞으로 텍스트 버튼, 재생/일시정지, 반복재생 */}
+        {/* 살짝 뒤로, 살짝 앞으로, 재생/일시정지, 반복재생 */}
         <div className="flex items-center gap-1 shrink-0 ml-auto">
-          {/* 살짝 뒤로 이동 버튼 */}
           <button
             type="button"
             onClick={() => stepFrame(-1)}
@@ -120,7 +188,6 @@ export default function SkateVideoPlayer({ src, videoUrl }: SkateVideoPlayerProp
             살짝 뒤로
           </button>
 
-          {/* 살짝 앞으로 이동 버튼 */}
           <button
             type="button"
             onClick={() => stepFrame(1)}
@@ -129,7 +196,6 @@ export default function SkateVideoPlayer({ src, videoUrl }: SkateVideoPlayerProp
             살짝 앞으로
           </button>
 
-          {/* 재생 / 일시정지 */}
           <button
             type="button"
             onClick={togglePlay}
@@ -139,7 +205,6 @@ export default function SkateVideoPlayer({ src, videoUrl }: SkateVideoPlayerProp
             {isPlaying ? <Pause size={13} /> : <Play size={13} className="ml-0.5 fill-white" />}
           </button>
 
-          {/* 반복 재생 */}
           <button
             type="button"
             onClick={toggleLoop}
