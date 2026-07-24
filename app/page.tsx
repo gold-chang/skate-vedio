@@ -1,4 +1,4 @@
-export const revalidate = 0; // 🚀 필터링 즉시 반영을 위해 캐시 방지
+export const revalidate = 0; // 필터링 즉시 반영을 위해 캐시 방지
 
 import { supabase } from '@/lib/supabase';
 import { Settings, Trophy, TrendingUp, Clock, RotateCcw } from 'lucide-react';
@@ -22,7 +22,7 @@ export default async function Home({ searchParams }: PageProps) {
 
   let orderByField = sortType === 'recent' ? 'created_at' : 'likes';
 
-  // 🚀 전체 칩 통계 추출용 데이터 50개 조회
+  // 전체 데이터 50개 조회
   const { data: rawVideos } = await supabase
     .from('videos')
     .select(`
@@ -36,7 +36,7 @@ export default async function Home({ searchParams }: PageProps) {
       tricks(name),
       video_tricks(tricks(name))
     `)
-    .order('likes', { ascending: false })
+    .order(orderByField, { ascending: false })
     .range(0, 49);
 
   const formattedAllVideos = (rawVideos || []).map((v: any) => {
@@ -51,7 +51,7 @@ export default async function Home({ searchParams }: PageProps) {
     return { ...v, tricksList: multiTricks || [] };
   }).filter(Boolean);
 
-  // 🚀 스팟/기술/보더 인기순 카운트
+  // 스팟/기술/보더 인기순 카운트
   const spotCounts: { [key: string]: number } = {};
   const trickCounts: { [key: string]: number } = {};
   const riderCounts: { [key: string]: number } = {};
@@ -75,7 +75,7 @@ export default async function Home({ searchParams }: PageProps) {
   const sampleTricks = Object.keys(trickCounts).sort((a, b) => trickCounts[b] - trickCounts[a]).slice(0, 8);
   const sampleRiders = Object.keys(riderCounts).sort((a, b) => riderCounts[b] - riderCounts[a]).slice(0, 8);
 
-  // 🚀 선택 필터 엄격 검증 필터링
+  // 선택 필터 검증
   const filteredVideos = formattedAllVideos.filter((v: any) => {
     if (!v) return false;
     const rider = Array.isArray(v.riders) ? v.riders[0] : v.riders;
@@ -90,14 +90,14 @@ export default async function Home({ searchParams }: PageProps) {
       if (!spot || !spot.name || !filterSpots.includes(spot.name)) return false;
     }
 
-    // 3. 기술 필터
+    // 3. 기술 필터 (알리 포함)
     if (filterTricks.length > 0) {
       if (!tricks || tricks.length === 0) return false;
       const hasMatchingTrick = tricks.some((t: any) => t?.name && filterTricks.includes(t.name));
       if (!hasMatchingTrick) return false;
     }
 
-    // 4. 보더(스케이터) 필터
+    // 4. 보더 필터
     if (filterRiders.length > 0) {
       if (!rider || !rider.name || !filterRiders.includes(rider.name)) return false;
     }
@@ -147,6 +147,9 @@ export default async function Home({ searchParams }: PageProps) {
 
   const hasActiveFilter = filterSpots.length > 0 || filterTricks.length > 0 || filterRiders.length > 0 || Boolean(filterType);
 
+  // 알리 필터 활성화 여부
+  const isOllieActive = filterTricks.includes('알리');
+
   return (
     <main className="min-h-screen bg-[#f7f4ef] text-[#2c2825] p-3 flex flex-col items-center justify-start max-w-md mx-auto pb-12 font-sans antialiased">
       {/* 상단 헤더 */}
@@ -187,11 +190,12 @@ export default async function Home({ searchParams }: PageProps) {
           )}
         </div>
 
-        {/* 프로 전용 필터 */}
-        <div className="flex items-center gap-2 border-b border-[#f0ebd9] pb-2">
+        {/* 🚀 상단 퀵 필터 바 (프로 영상만 보기 & 알리 영상 모아보기) */}
+        <div className="flex items-center gap-1.5 border-b border-[#f0ebd9] pb-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {/* 프로 전용 필터 */}
           <Link
             href={filterType === '프로' ? '/' : `/?type=프로${sortType ? `&sort=${sortType}` : ''}`}
-            className={`flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full transition border ${
+            className={`flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full transition border shrink-0 ${
               filterType === '프로'
                 ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
                 : 'bg-[#f0ebd9] text-[#7a5c38] border-[#e4ddc7] hover:bg-[#e4ddc7]'
@@ -199,6 +203,18 @@ export default async function Home({ searchParams }: PageProps) {
           >
             <Trophy size={12} />
             <span>🏆 프로 영상만 보기</span>
+          </Link>
+
+          {/* 알리 영상 모아보기 필터 */}
+          <Link
+            href={getFilterUrl('trick', '알리')}
+            className={`flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full transition border shrink-0 ${
+              isOllieActive
+                ? 'bg-[#3d332a] text-white border-[#3d332a] shadow-2xs'
+                : 'bg-[#f0ebd9] text-[#7a5c38] border-[#e4ddc7] hover:bg-[#e4ddc7]'
+            }`}
+          >
+            <span>🛹 알리 영상 모아보기</span>
           </Link>
         </div>
 
