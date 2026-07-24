@@ -33,7 +33,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
   const [commentContent, setCommentContent] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // 🚀 [공유 링크 접속 대응] 이전 페이지 히스토리가 없으면 메인 홈(/)으로 이동
+  // 🚀 히스토리가 있으면 router.back()으로 돌아가야 이전 필터 & 스크롤 위치가 유지됩니다.
   const handleGoBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer.includes(window.location.host)) {
       router.back();
@@ -187,7 +187,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
           <ArrowLeft size={16} /> 목록으로
         </button>
 
-        {/* 상단 메인 로고 */}
+        {/* 상단 로고 클릭 시에만 전체 초기화 메인으로 이동 */}
         <Link href="/" className="flex items-center active:scale-95 transition">
           <Image
             src="/logo.png"
@@ -203,7 +203,7 @@ export default function VideoDetailPage({ params }: { params: Promise<{ id: stri
         <ShareButton />
       </div>
 
-      {/* 비디오 플레이어 & 제어 컨트롤러 */}
+      {/* 비디오 플레이어 */}
       <div className="w-full mb-3">
         <SkateVideoPlayer src={video.video_url || ''} />
       </div>
