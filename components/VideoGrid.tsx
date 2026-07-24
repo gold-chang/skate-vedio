@@ -36,30 +36,39 @@ export default function VideoGrid({
   const tricksList = typeof filterTrick === 'string' && filterTrick.trim() ? filterTrick.split(',').filter(Boolean) : [];
   const ridersList = typeof filterRider === 'string' && filterRider.trim() ? filterRider.split(',').filter(Boolean) : [];
 
+  // 🚀 [핵심] 100% 철저한 필터 검증 함수
   const applyFilters = (rawList: any[]) => {
     if (!rawList || !Array.isArray(rawList)) return [];
 
     return rawList.filter((v: any) => {
       if (!v) return false;
 
-      const rider = Array.isArray(v.riders) ? v.riders[0] : v.riders;
-      const spot = Array.isArray(v.spots) ? v.spots[0] : v.spots;
-      const tricks = Array.isArray(v.tricksList) ? v.tricksList : [];
+      // riders / spots 객체 및 배열 파싱
+      const riderObj = Array.isArray(v.riders) ? v.riders[0] : v.riders;
+      const spotObj = Array.isArray(v.spots) ? v.spots[0] : v.spots;
+      const tricksArr = Array.isArray(v.tricksList) ? v.tricksList : [];
 
-      if (filterType && rider?.rider_type !== filterType) return false;
+      const riderName = riderObj?.name ? String(riderObj.name).trim() : '';
+      const spotName = spotObj?.name ? String(spotObj.name).trim() : '';
 
+      // 1. 프로 필터
+      if (filterType && riderObj?.rider_type !== filterType) return false;
+
+      // 2. 스팟 필터
       if (spotsList.length > 0) {
-        if (!spot || !spot.name || !spotsList.includes(spot.name)) return false;
+        if (!spotName || !spotsList.includes(spotName)) return false;
       }
 
+      // 3. 기술 필터
       if (tricksList.length > 0) {
-        if (!tricks || tricks.length === 0) return false;
-        const hasMatchingTrick = tricks.some((t: any) => t && t.name && tricksList.includes(t.name));
+        if (!tricksArr || tricksArr.length === 0) return false;
+        const hasMatchingTrick = tricksArr.some((t: any) => t?.name && tricksList.includes(String(t.name).trim()));
         if (!hasMatchingTrick) return false;
       }
 
+      // 4. 보더(라이더) 필터 (스크린샷 오류 해결 핵심)
       if (ridersList.length > 0) {
-        if (!rider || !rider.name || !ridersList.includes(rider.name)) return false;
+        if (!riderName || !ridersList.includes(riderName)) return false;
       }
 
       return true;
@@ -162,7 +171,6 @@ export default function VideoGrid({
     return () => observer.disconnect();
   }, [hasMore, isLoading, page]);
 
-  // 🚀 칩 클릭 시 영상 상세 이동 차단 및 필터 적용 함수
   const handleFilterClick = (e: React.MouseEvent, type: 'spot' | 'trick' | 'rider', value: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -203,7 +211,7 @@ export default function VideoGrid({
                 playsInline
               />
 
-              {/* 상단 프로 & 좋아요 라벨 */}
+              {/* 상단 프로 & 좋아요 */}
               <div className="absolute top-0 inset-x-0 p-2.5 flex items-center justify-between bg-gradient-to-b from-black/60 via-transparent to-transparent pointer-events-none">
                 {r?.rider_type === '프로' ? (
                   <div className="bg-amber-600/90 backdrop-blur-md px-2 py-0.5 rounded-md text-white text-[10px] font-extrabold shadow-2xs flex items-center gap-0.5 pointer-events-auto">
@@ -219,7 +227,7 @@ export default function VideoGrid({
                 </div>
               </div>
 
-              {/* 🚀 하단 칩 태그 영역 (클릭 시 이벤트 전파 방지 + 필터 동작) */}
+              {/* 하단 칩 태그 */}
               <div className="absolute bottom-0 inset-x-0 p-2.5 bg-gradient-to-t from-black/85 via-black/40 to-transparent flex flex-col gap-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {s?.name && (

@@ -1,4 +1,4 @@
-export const revalidate = 60;
+export const revalidate = 0; // 🚀 필터링 즉시 반영을 위해 캐시 방지
 
 import { supabase } from '@/lib/supabase';
 import { Settings, Trophy, TrendingUp, Clock, RotateCcw } from 'lucide-react';
@@ -22,6 +22,7 @@ export default async function Home({ searchParams }: PageProps) {
 
   let orderByField = sortType === 'recent' ? 'created_at' : 'likes';
 
+  // 🚀 전체 칩 통계 추출용 데이터 50개 조회
   const { data: rawVideos } = await supabase
     .from('videos')
     .select(`
@@ -35,11 +36,10 @@ export default async function Home({ searchParams }: PageProps) {
       tricks(name),
       video_tricks(tricks(name))
     `)
-    .order(orderByField, { ascending: false })
+    .order('likes', { ascending: false })
     .range(0, 49);
 
-  // 🚀 [핵심] tricksList가 절대 undefined가 되지 않도록 안전 가공
-  const allVideos = (rawVideos || []).map((v: any) => {
+  const formattedAllVideos = (rawVideos || []).map((v: any) => {
     if (!v) return null;
     let multiTricks: any[] = [];
     if (v.video_tricks && Array.isArray(v.video_tricks) && v.video_tricks.length > 0) {
@@ -51,11 +51,12 @@ export default async function Home({ searchParams }: PageProps) {
     return { ...v, tricksList: multiTricks || [] };
   }).filter(Boolean);
 
+  // 🚀 스팟/기술/보더 인기순 카운트
   const spotCounts: { [key: string]: number } = {};
   const trickCounts: { [key: string]: number } = {};
   const riderCounts: { [key: string]: number } = {};
 
-  allVideos.forEach((v: any) => {
+  formattedAllVideos.forEach((v: any) => {
     if (!v) return;
     const sName = Array.isArray(v.spots) ? v.spots[0]?.name : v.spots?.name;
     const rName = Array.isArray(v.riders) ? v.riders[0]?.name : v.riders?.name;
@@ -73,6 +74,36 @@ export default async function Home({ searchParams }: PageProps) {
   const sampleSpots = Object.keys(spotCounts).sort((a, b) => spotCounts[b] - spotCounts[a]).slice(0, 8);
   const sampleTricks = Object.keys(trickCounts).sort((a, b) => trickCounts[b] - trickCounts[a]).slice(0, 8);
   const sampleRiders = Object.keys(riderCounts).sort((a, b) => riderCounts[b] - riderCounts[a]).slice(0, 8);
+
+  // 🚀 선택 필터 엄격 검증 필터링
+  const filteredVideos = formattedAllVideos.filter((v: any) => {
+    if (!v) return false;
+    const rider = Array.isArray(v.riders) ? v.riders[0] : v.riders;
+    const spot = Array.isArray(v.spots) ? v.spots[0] : v.spots;
+    const tricks = Array.isArray(v.tricksList) ? v.tricksList : [];
+
+    // 1. 프로 전용 필터
+    if (filterType && rider?.rider_type !== filterType) return false;
+
+    // 2. 스팟 필터
+    if (filterSpots.length > 0) {
+      if (!spot || !spot.name || !filterSpots.includes(spot.name)) return false;
+    }
+
+    // 3. 기술 필터
+    if (filterTricks.length > 0) {
+      if (!tricks || tricks.length === 0) return false;
+      const hasMatchingTrick = tricks.some((t: any) => t?.name && filterTricks.includes(t.name));
+      if (!hasMatchingTrick) return false;
+    }
+
+    // 4. 보더(스케이터) 필터
+    if (filterRiders.length > 0) {
+      if (!rider || !rider.name || !filterRiders.includes(rider.name)) return false;
+    }
+
+    return true;
+  });
 
   const getFilterUrl = (type: 'spot' | 'trick' | 'rider', value: string) => {
     const base = new URLSearchParams();
@@ -171,7 +202,7 @@ export default async function Home({ searchParams }: PageProps) {
           </Link>
         </div>
 
-        {/* 칩 목록 (가로 스크롤) */}
+        {/* 칩 목록 */}
         <div className="flex flex-col gap-2">
           {sampleSpots.length > 0 && (
             <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-0.5">
@@ -276,7 +307,7 @@ export default async function Home({ searchParams }: PageProps) {
       {/* 2열 그리드 영상 목록 */}
       <section className="w-full">
         <VideoGrid
-          initialVideos={allVideos}
+          initialVideos={filteredVideos}
           filterSpot={params.spot}
           filterTrick={params.trick}
           filterRider={params.rider}
